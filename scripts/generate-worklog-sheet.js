@@ -377,6 +377,18 @@ function createWorkbook() {
       "Deliverables & Code Files": "apps/web/src/app/api/v1/audits/[jobId]/route.ts, apps/web/src/app/audits/page.tsx, apps/web/src/app/audits/AuditsListClient.tsx, apps/web/src/app/audits/[jobId]/page.tsx",
       "Impact & Technical Notes": "Implemented secure DELETE /api/v1/audits/[jobId] enforcing tenant workspace isolation with PostgreSQL foreign-key cascade deleting associated executions, lighthouse runs, crux data, and audit issues. Built interactive client AuditsListClient with one-click trash icon, confirmation modal, and optimistic state removal. Added header Delete Audit action in the audit job detail view.",
       "Developer": "Pritom & Antigravity"
+    },
+    {
+      "Task ID": "SP-32",
+      "Date": "2026-11-13",
+      "Category": "CI/CD & DevOps Automation",
+      "Task / Feature Description": "AI CI/CD Regression Guard & PR Patch Bot with GitHub Action",
+      "Est. Hours": 2.0,
+      "Actual Hours": 2.0,
+      "Status": "Completed",
+      "Deliverables & Code Files": "apps/web/src/app/api/v1/ci/guard/route.ts, scripts/ci-guard.mjs, action.yml, apps/web/src/app/audits/AuditsListClient.tsx",
+      "Impact & Technical Notes": "Shipped enterprise CI/CD performance and SEO regression protection. Built POST /api/v1/ci/guard to evaluate preview deployments against configurable Core Web Vitals and SEO score budgets, persisting audit jobs with CI_CD_PR provenance and generating GitHub Markdown PR scorecards with .patch remediation snippets. Provided standalone CLI runner scripts/ci-guard.mjs with automatic GitHub PR comment posting/updating and action.yml for one-line GitHub Actions CI workflows.",
+      "Developer": "Pritom & Antigravity"
     }
   ];
 
@@ -459,13 +471,13 @@ function createWorkbook() {
       "Strategic Value": "Guarantees workspace data hygiene, GDPR compliance, and immediate client-side UI responsiveness."
     },
     {
-      "Milestone": "F-01",
+      "Milestone": "F-01 (SP-32)",
       "Priority": "P0 - Immediate",
-      "Status": "Planned (Next Up)",
+      "Status": "Completed",
       "Target Audience": "DevOps Engineers, Software Developers, Engineering Teams",
       "Feature Name": "AI-Automated CI/CD Regression Guard & PR Patch Bot",
-      "Est. Hours": 4.5,
-      "Key Deliverables": "GitHub Action (speedpilot/action-guard@v1) triggering on Pull Requests against ephemeral preview URLs (Vercel/Netlify), budget evaluation, and auto-posting PR comments with before/after diffs and downloadable .patch files.",
+      "Est. Hours": 2.0,
+      "Key Deliverables": "POST /api/v1/ci/guard budget evaluation, scripts/ci-guard.mjs CLI runner with GitHub PR comment sync, action.yml composite GitHub Action, and CI/PR badges on /audits.",
       "Strategic Value": "Catches regressions before production deployment, embedding SpeedPilot directly into daily developer workflow."
     },
     {

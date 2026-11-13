@@ -19,6 +19,8 @@ const PUBLIC_PREFIXES = [
   "/api/v1/health",
   "/api/v1/audits/trial",
   "/api/v1/billing/webhook",
+  "/api/v1/comparisons/battle",
+  "/api/v1/ci/guard",
   "/_next",
   "/favicon.ico",
 ];

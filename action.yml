@@ -1,0 +1,48 @@
+name: "SpeedPilot CI Performance & SEO Guard"
+description: "Autonomous Core Web Vitals, Lighthouse & SEO regression guard with automated PR diff comments and Git patch suggestions."
+author: "SpeedPilot Team"
+branding:
+  icon: "zap"
+  color: "blue"
+
+inputs:
+  url:
+    description: "Preview deployment URL to audit (e.g. Vercel, Netlify, Cloudflare Pages)"
+    required: true
+  baseline-url:
+    description: "Production or baseline URL to measure performance diff against"
+    required: false
+  device:
+    description: "Audit device mode: MOBILE or DESKTOP"
+    required: false
+    default: "MOBILE"
+  github-token:
+    description: "GitHub token (secrets.GITHUB_TOKEN) to post markdown comments to the Pull Request"
+    required: false
+  speedpilot-url:
+    description: "Custom SpeedPilot API instance URL (defaults to hosted cloud)"
+    required: false
+    default: "https://speedpilot.webdevwithpritom.com"
+  non-blocking:
+    description: "If set to true, passes the action step even if performance budgets fail"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run SpeedPilot CI Guard
+      shell: bash
+      env:
+        TARGET_URL: ${{ inputs.url }}
+        BASELINE_URL: ${{ inputs.baseline-url }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_HEAD_REF: ${{ github.head_ref }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+        SPEEDPILOT_URL: ${{ inputs.speedpilot-url }}
+        NON_BLOCKING: ${{ inputs.non-blocking }}
+      run: |
+        node ${{ github.action_path }}/scripts/ci-guard.mjs --device="${{ inputs.device }}"
+
