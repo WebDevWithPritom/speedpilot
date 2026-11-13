@@ -347,11 +347,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Trigger async processing in background
-    for (const task of executionTasks) {
-      // Fire and forget in Node event loop
-      executeAuditAsync(task.executionId, auditJob.id, task.url, task.device).catch(console.error);
-    }
+    // Trigger async processing in background using controlled concurrency queue
+    // Google PageSpeed Insights performs best with 3-4 parallel browser sessions
+    const CONCURRENCY_LIMIT = 3;
+    (async () => {
+      let taskIndex = 0;
+      async function runWorker() {
+        while (taskIndex < executionTasks.length) {
+          const currentTask = executionTasks[taskIndex++];
+          if (!currentTask) break;
+          try {
+            await executeAuditAsync(currentTask.executionId, auditJob.id, currentTask.url, currentTask.device);
+          } catch (e) {
+            console.error(`Audit error for ${currentTask.url}:`, e);
+          }
+          // Brief pacing delay between tasks
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      }
+
+      const workers = Array.from(
+        { length: Math.min(CONCURRENCY_LIMIT, executionTasks.length) },
+        () => runWorker()
+      );
+      await Promise.all(workers);
+    })().catch(console.error);
 
     return NextResponse.json(
       {
