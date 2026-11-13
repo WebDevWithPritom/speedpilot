@@ -437,6 +437,18 @@ function createWorkbook() {
       "Deliverables & Code Files": "apps/web/src/app/audits/[jobId]/page.tsx, apps/web/src/app/api/v1/audits/[jobId]/process-batch/route.ts, apps/web/src/app/api/v1/audits/[jobId]/route.ts",
       "Impact & Technical Notes": "Eliminated repetitive manual clicking to finish large audits. Built automatic auto-resume trigger on mount when paused executions are detected, refined watchdog to check latest execution timestamp and prevent premature timeout reassignment, and added live auto-processing banner with Pause/Resume controls.",
       "Developer": "Pritom & Antigravity"
+    },
+    {
+      "Task ID": "SP-37",
+      "Date": "2026-11-13",
+      "Category": "Monetization & Contributor Identity",
+      "Task / Feature Description": "Monetization Alignment: Purge Buy Me a Coffee & Integrate Razorpay Community Supporter Pass (₹499) with Contributor Graph Sync",
+      "Est. Hours": 1.5,
+      "Actual Hours": 1.5,
+      "Status": "Completed",
+      "Deliverables & Code Files": "apps/web/src/app/pricing/page.tsx, apps/web/src/components/landing/LandingPage.tsx, apps/web/src/components/billing/RazorpayUpgradeButton.tsx, apps/web/src/app/api/v1/billing/checkout/route.ts, README.md, DEVELOPMENT-STATUS.md",
+      "Impact & Technical Notes": "Purged all external Buy Me a Coffee references and replaced with the native Razorpay Community Supporter Pass (₹499 one-time direct contribution via UPI/QR/Cards). Synchronized git author identity across all commits to WebDevWithPritom <pritomsinha258@gmail.com>, officially linking 37 contributions to the user's GitHub profile graph.",
+      "Developer": "Pritom & Antigravity"
     }
   ];
 

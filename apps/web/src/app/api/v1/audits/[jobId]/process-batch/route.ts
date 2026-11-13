@@ -26,7 +26,7 @@ export async function POST(
       return NextResponse.json({ error: "Audit job not found" }, { status: 404 });
     }
 
-    const BATCH_SIZE = 15;
+    const BATCH_SIZE = 6;
 
     // 1. Fetch existing queued executions
     let queuedExecutions = await prisma.auditExecution.findMany({
@@ -118,8 +118,8 @@ export async function POST(
       aiBaseUrl: req.headers.get("x-custom-ai-base-url") || undefined,
     };
 
-    // Run batch with controlled concurrency (5 workers)
-    const CONCURRENCY = 5;
+    // Run batch with controlled concurrency (6 parallel workers for rapid micro-batches)
+    const CONCURRENCY = 6;
     const targetJobId = jobId;
     let index = 0;
     async function worker() {

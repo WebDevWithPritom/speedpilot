@@ -161,7 +161,7 @@ export async function executeAuditAsync(
       .map((created, i) => ({ created, raw: allIssuesToPersist[i] }))
       .filter((p) => Boolean(p.raw))
       .sort((a, b) => (sevRank[b.raw.severity] || 0) - (sevRank[a.raw.severity] || 0))
-      .slice(0, 15);
+      .slice(0, 3);
 
     await Promise.allSettled(
       aiSynthTasks.map(async ({ created, raw }) => {

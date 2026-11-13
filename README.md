@@ -21,16 +21,18 @@
 
 ## 🌟 What is SpeedPilot?
 
-SpeedPilot runs multi-page Lighthouse and CrUX audits in bulk and outputs framework-specific code fixes:
+SpeedPilot runs multi-page Lighthouse, CrUX, and SEO audits in bulk, tracks SERP rankings, and outputs framework-specific code fixes:
 
 1. **Instant 1-Click Audits:** Benchmark any public website immediately from the hero section (no registration required).
-2. **Bulk Multi-Page Auditing:** Audit single URLs, CSV lists, or auto-discover entire XML sitemaps (500+ URLs) concurrently across Mobile and Desktop.
+2. **Bulk Multi-Page Auditing:** Audit single URLs, CSV lists, or auto-discover entire XML sitemaps (500+ URLs) concurrently across Mobile and Desktop with an auto-resuming rolling serverless runner.
 3. **Lab vs Field Metrics:** Strict separation of **Lighthouse synthetic lab diagnostics** and **Chrome UX Report (CrUX) 28-day real-user field telemetry** (never confuses TBT with INP).
-4. **Independent Technical SEO Crawler:** In-house static HTML engine inspecting metadata, canonicals, robots directives, heading structure, broken links, and structured data with SSRF protection.
-5. **Context-Aware AI Code Fixes:** Framework-specific code diffs for Next.js, React, WordPress, WooCommerce, Shopify, or Laravel with signature caching.
-6. **Multi-Persona Perspective Lens:** View every audit through 4 dedicated lenses: **Developer**, **Marketer**, **Agency**, or **SaaS Team**.
-7. **Monetization & Agency Passes:** Built-in Razorpay checkout supporting Cards, UPI, and Netbanking for Pro passes.
-8. **Executive Deliverables:** Export printer-ready branded HTML/PDF client summaries and CSV datasets.
+4. **Zero-Cost SERP Rank Tracker (DataForSEO Alternative):** Dual-engine Google SERP tracker and competitor position extractor with 0 monthly subscription costs, Top 10 organic competitor spy, Google People Also Ask (PAA) questions, and AI rank-climbing action plan.
+5. **All-in-One SEO Suite:** Screaming Frog Spider mode (internal/external/nofollow link equity, heading hierarchy, indexability), Semrush mode (600px pixel-width Google SERP simulator & TF-IDF keyword density), and Ahrefs mode (0-100 Site Health score & Schema.org rich types validator).
+6. **AI CI/CD Regression Guard & PR Bot:** Official composite GitHub Action (`action.yml`) evaluating Core Web Vitals budgets on pull requests and posting automated markdown scorecards with `.patch` fixes.
+7. **Context-Aware AI Code Fixes:** Framework-specific code diffs for Next.js, React, WordPress, WooCommerce, Shopify, or Laravel with signature caching.
+8. **Multi-Persona Perspective Lens:** View every audit through 4 dedicated lenses: **Developer**, **Marketer**, **Agency**, or **SaaS Team**.
+9. **Monetization & Agency Passes:** Built-in Razorpay checkout supporting UPI, QR, Cards, and Netbanking for Community Supporter (₹499), Pro, and Agency passes.
+10. **Executive Deliverables:** Export printer-ready branded HTML/PDF client summaries and CSV datasets.
 
 ---
 
