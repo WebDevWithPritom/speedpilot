@@ -45,12 +45,16 @@ echo "SpeedPilot Next.js launched with PID $(cat speedpilot.pid)"
 
   try {
     await client.send('SITE CHMOD 755 speedpilot/daemon.sh');
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[upload-daemon] Warning: CHMOD command was ignored or not supported:', e.message);
+  }
 
   // Also remove test diag.php to keep directory clean
   try {
     await client.remove('speedpilot/diag.php');
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[upload-daemon] Info: diag.php already clean or removal failed:', e.message);
+  }
 
   console.log('daemon.sh uploaded and set to executable (755)!');
   client.close();

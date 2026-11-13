@@ -105,10 +105,7 @@ function buildPreconnectSnippet(origins: string[]): string {
     return `<!-- All flagged resources are on your own origin — no cross-origin <link rel="preconnect"> needed. -->`;
   }
   return origins
-    .map(
-      (origin) =>
-        `<link rel="preconnect" href="${origin}" crossorigin>\n<link rel="dns-prefetch" href="${origin}">`
-    )
+    .map((origin) => `<link rel="preconnect" href="${origin}" crossorigin>\n<link rel="dns-prefetch" href="${origin}">`)
     .join("\n");
 }
 

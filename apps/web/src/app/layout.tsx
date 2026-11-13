@@ -31,7 +31,7 @@ export default async function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try { if (localStorage.getItem("sp_theme") === "dark") { document.documentElement.classList.add("dark"); } else { document.documentElement.classList.remove("dark"); } } catch(e) {}`,
+            __html: `try { if (localStorage.getItem("sp_theme") === "dark") { document.documentElement.classList.add("dark"); } else { document.documentElement.classList.remove("dark"); } } catch (e) { console.warn("Failed to load theme preference:", e); }`,
           }}
         />
       </head>
