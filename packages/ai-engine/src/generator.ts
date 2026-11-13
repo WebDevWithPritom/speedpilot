@@ -185,7 +185,8 @@ Rules:
 1. Preserve the exact technical fix pattern shown in recommendedFixBaseline (do NOT change cache-insight to <link rel="preload">, never truncate URLs).
 2. If userSourceCode is provided, patch those exact lines for ${req.techStack}.
 3. Only suggest <link rel="preconnect"> for thirdPartyUrls (NEVER for targetUrl's own origin).
-4. Respect detectedPluginsAndCDN and existingHeadHints. Output pure JSON without markdown fences.`;
+4. Respect detectedPluginsAndCDN and existingHeadHints. Output pure JSON without markdown fences.
+5. No AI slop: Avoid throat-clearing ("Here is why", "In today's world"), binary contrasts ("It is not X, it is Y"), colon reveals, rhetorical setups, and vague puffery ("pivotal", "vital role", "testament"). State the specific bottleneck, exact metrics, and direct remediation.`;
 
   // Try candidates sequentially so rate limits or blocked keys auto-failover
   for (const candidate of candidates) {

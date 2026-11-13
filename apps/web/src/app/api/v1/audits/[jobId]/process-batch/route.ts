@@ -26,60 +26,10 @@ export async function POST(
       return NextResponse.json({ error: "Audit job not found" }, { status: 404 });
     }
 
-    // Auto-recover any executions that were paused/timed-out by serverless host limits
-    const timedOutCount = await prisma.auditExecution.count({
-      where: {
-        auditJobId: job.id,
-        status: "FAILED",
-        OR: [
-          { errorMessage: { contains: "Timed out" } },
-          { errorMessage: { contains: "serverless" } },
-          { errorMessage: { contains: "Paused" } },
-          { errorMessage: null },
-        ],
-      },
-    });
-
-    if (timedOutCount > 0) {
-      await prisma.auditExecution.updateMany({
-        where: {
-          auditJobId: job.id,
-          status: "FAILED",
-          OR: [
-            { errorMessage: { contains: "Timed out" } },
-            { errorMessage: { contains: "serverless" } },
-            { errorMessage: { contains: "Paused" } },
-            { errorMessage: null },
-          ],
-        },
-        data: {
-          status: "QUEUED",
-          errorMessage: null,
-        },
-      });
-
-      const newFailedCount = Math.max(0, job.failedUrls - timedOutCount);
-      await prisma.auditJob.update({
-        where: { id: job.id },
-        data: {
-          status: "PROCESSING",
-          startedAt: new Date(),
-          failedUrls: newFailedCount,
-        },
-      });
-    } else {
-      await prisma.auditJob.update({
-        where: { id: job.id },
-        data: {
-          status: "PROCESSING",
-          startedAt: new Date(),
-        },
-      });
-    }
-
-    // Fetch the next batch of queued executions (batch size 15)
     const BATCH_SIZE = 15;
-    const queuedExecutions = await prisma.auditExecution.findMany({
+
+    // 1. Fetch existing queued executions
+    let queuedExecutions = await prisma.auditExecution.findMany({
       where: {
         auditJobId: job.id,
         status: "QUEUED",
@@ -88,39 +38,77 @@ export async function POST(
       select: { id: true, url: true, device: true },
     });
 
+    // 2. If no QUEUED executions remain, check for any uncompleted executions (FAILED, AUDITING, FETCHING)
     if (queuedExecutions.length === 0) {
-      const allExecutions = await prisma.auditExecution.findMany({
-        where: { auditJobId: job.id },
-        select: { status: true },
+      const incompleteCount = await prisma.auditExecution.count({
+        where: {
+          auditJobId: job.id,
+          status: { not: "COMPLETED" },
+        },
       });
 
-      const allDone = allExecutions.every((e) => e.status === "COMPLETED" || e.status === "FAILED");
-      const anyCompleted = allExecutions.some((e) => e.status === "COMPLETED");
-      const finalStatus = allExecutions.every((e) => e.status === "COMPLETED")
-        ? "COMPLETED"
-        : anyCompleted
-        ? "PARTIAL_FAILURE"
-        : "FAILED";
+      if (incompleteCount > 0) {
+        // Recover all non-completed executions to QUEUED so batching continues
+        await prisma.auditExecution.updateMany({
+          where: {
+            auditJobId: job.id,
+            status: { not: "COMPLETED" },
+          },
+          data: {
+            status: "QUEUED",
+            errorMessage: null,
+          },
+        });
 
-      if (allDone && job.status !== finalStatus) {
-        await prisma.auditJob.update({
-          where: { id: job.id },
-          data: { status: finalStatus, completedAt: new Date() },
+        // Now pick up the first batch from the newly re-queued executions
+        queuedExecutions = await prisma.auditExecution.findMany({
+          where: {
+            auditJobId: job.id,
+            status: "QUEUED",
+          },
+          take: BATCH_SIZE,
+          select: { id: true, url: true, device: true },
         });
       }
+    }
+
+    // 3. If there are still 0 executions, then literally every execution in the job is COMPLETED
+    if (queuedExecutions.length === 0) {
+      const refreshedJob = await prisma.auditJob.findUnique({
+        where: { id: job.id },
+        select: { completedUrls: true, totalUrls: true },
+      });
+
+      await prisma.auditJob.update({
+        where: { id: job.id },
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+          failedUrls: 0,
+        },
+      });
 
       return NextResponse.json({
         data: {
           batchProcessed: 0,
           remainingQueued: 0,
-          totalCompleted: job.completedUrls,
-          totalUrls: job.totalUrls,
+          totalCompleted: refreshedJob?.completedUrls ?? job.totalUrls,
+          totalUrls: refreshedJob?.totalUrls ?? job.totalUrls,
           isAllFinished: true,
-          status: allDone ? finalStatus : job.status,
+          status: "COMPLETED",
           message: "All audit executions have completed.",
         },
       });
     }
+
+    // Keep job in PROCESSING state and update startedAt
+    await prisma.auditJob.update({
+      where: { id: job.id },
+      data: {
+        status: "PROCESSING",
+        startedAt: new Date(),
+      },
+    });
 
     const customKeys: CustomAuditKeys = {
       googleKey: req.headers.get("x-custom-google-key") || undefined,
@@ -158,11 +146,11 @@ export async function POST(
     );
     await Promise.all(workers);
 
-    // Refresh remaining queued count
-    const totalRemainingQueued = await prisma.auditExecution.count({
+    // Refresh remaining incomplete count (anything not COMPLETED)
+    const remainingIncomplete = await prisma.auditExecution.count({
       where: {
         auditJobId: job.id,
-        status: "QUEUED",
+        status: { not: "COMPLETED" },
       },
     });
 
@@ -171,14 +159,21 @@ export async function POST(
       select: { completedUrls: true, failedUrls: true, totalUrls: true, status: true },
     });
 
+    if (remainingIncomplete === 0 && refreshedJob?.status !== "COMPLETED") {
+      await prisma.auditJob.update({
+        where: { id: job.id },
+        data: { status: "COMPLETED", completedAt: new Date() },
+      });
+    }
+
     return NextResponse.json({
       data: {
         batchProcessed: queuedExecutions.length,
-        remainingQueued: totalRemainingQueued,
+        remainingQueued: remainingIncomplete,
         totalCompleted: refreshedJob?.completedUrls ?? 0,
         totalUrls: refreshedJob?.totalUrls ?? 0,
-        isAllFinished: totalRemainingQueued === 0,
-        status: refreshedJob?.status ?? "PROCESSING",
+        isAllFinished: remainingIncomplete === 0,
+        status: remainingIncomplete === 0 ? "COMPLETED" : "PROCESSING",
       },
     });
   } catch (error: unknown) {

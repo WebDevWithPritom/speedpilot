@@ -312,7 +312,7 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="max-w-2xl space-y-2">
             <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Full Spectrum Intelligence
+              Audit Capabilities
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
               Engineered for web performance engineers &amp; SEO teams

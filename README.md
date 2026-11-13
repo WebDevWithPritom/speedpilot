@@ -1,7 +1,6 @@
 # SpeedPilot ⚡
 
-> **Universal Website Performance Intelligence & Optimization Platform**  
-> *"Audit. Understand. Optimize. Improve."*
+> **Universal Website Performance Intelligence & Optimization Platform**
 
 [![Live Demo](https://img.shields.io/badge/Demo-speedpilot.webdevwithpritom.com-0070f3?style=flat&logo=vercel)](https://speedpilot.webdevwithpritom.com)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -22,11 +21,11 @@
 
 ## 🌟 What is SpeedPilot?
 
-SpeedPilot transforms raw website performance auditing into an actionable, automated intelligence lifecycle. Unlike basic single-page checkers, SpeedPilot provides:
+SpeedPilot runs multi-page Lighthouse and CrUX audits in bulk and outputs framework-specific code fixes:
 
 1. **Instant 1-Click Audits:** Benchmark any public website immediately from the hero section (no registration required).
 2. **Bulk Multi-Page Auditing:** Audit single URLs, CSV lists, or auto-discover entire XML sitemaps (500+ URLs) concurrently across Mobile and Desktop.
-3. **Dual-Lens Data Integrity:** Strict separation of **Lighthouse synthetic lab diagnostics** and **Chrome UX Report (CrUX) 28-day real-user field telemetry** (never confuses TBT with INP).
+3. **Lab vs Field Metrics:** Strict separation of **Lighthouse synthetic lab diagnostics** and **Chrome UX Report (CrUX) 28-day real-user field telemetry** (never confuses TBT with INP).
 4. **Independent Technical SEO Crawler:** In-house static HTML engine inspecting metadata, canonicals, robots directives, heading structure, broken links, and structured data with SSRF protection.
 5. **Context-Aware AI Code Fixes:** Framework-specific code diffs for Next.js, React, WordPress, WooCommerce, Shopify, or Laravel with signature caching.
 6. **Multi-Persona Perspective Lens:** View every audit through 4 dedicated lenses: **Developer**, **Marketer**, **Agency**, or **SaaS Team**.

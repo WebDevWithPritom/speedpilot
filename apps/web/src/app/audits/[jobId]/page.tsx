@@ -161,22 +161,13 @@ export default function BulkAuditJobResultsPage() {
     return () => clearInterval(interval);
   }, [jobId, jobData?.status]);
 
-  // Auto-start resume immediately on page load / mount if audit has unfinished/paused URLs
+  // Auto-start resume immediately on page load / mount if audit has unfinished URLs
   useEffect(() => {
     if (!jobData || loading || autoStartedRef.current || resuming) return;
 
-    const executions = jobData.executions || [];
-    const hasTimedOut = executions.some(
-      (e: any) =>
-        e.status === "FAILED" &&
-        (e.errorMessage?.includes("Timed out") ||
-          e.errorMessage?.includes("serverless") ||
-          e.errorMessage?.includes("Paused"))
-    );
-    const hasQueued = executions.some((e: any) => e.status === "QUEUED");
     const isUnfinished = jobData.progress && jobData.progress.completed < jobData.progress.total;
 
-    if (isUnfinished && (hasTimedOut || hasQueued)) {
+    if (isUnfinished) {
       autoStartedRef.current = true;
       handleResumeAudit(true);
     }
@@ -213,13 +204,8 @@ export default function BulkAuditJobResultsPage() {
   }
 
   const executions = jobData.executions || [];
-  const hasTimedOutExecutions = executions.some(
-    (e: any) =>
-      e.status === "FAILED" &&
-      (e.errorMessage?.includes("Timed out") || e.errorMessage?.includes("serverless") || e.errorMessage?.includes("Paused"))
-  );
-  const hasQueuedExecutions = executions.some((e: any) => e.status === "QUEUED");
-  const canResume = hasTimedOutExecutions || hasQueuedExecutions;
+  const canResume = Boolean(jobData.progress && jobData.progress.completed < jobData.progress.total);
+  const hasTimedOutExecutions = canResume;
 
   // Filter & Sort
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1138,7 +1124,7 @@ Exported from SpeedPilot SaaS Team Console`;
 
                         {/* Execution Status */}
                         <td className="py-2 px-2 text-center">
-                          <StatusBadge status={ex.status} />
+                          <StatusBadge status={ex.errorMessage?.includes("Paused") ? "PAUSED" : ex.status} />
                         </td>
 
                         {/* Action Link */}
