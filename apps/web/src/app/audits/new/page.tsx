@@ -13,10 +13,13 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  Compass,
+  Bot,
+  Link2,
 } from "lucide-react";
 import { parseBulkUrlString, validateAndNormalizeUrl } from "@speedpilot/shared";
 
-type InputTab = "single" | "textarea" | "csv" | "sitemap";
+type InputTab = "single" | "textarea" | "csv" | "sitemap" | "agentic";
 
 interface ChildSitemap {
   url: string;
@@ -41,6 +44,16 @@ export default function NewAuditPage() {
   const [isSitemapIndex, setIsSitemapIndex] = useState(false);
   const [childSitemaps, setChildSitemaps] = useState<ChildSitemap[]>([]);
   const [selectedChildUrls, setSelectedChildUrls] = useState<Set<string>>(new Set());
+
+  // Agentic autonomous crawler state
+  const [agenticRootUrl, setAgenticRootUrl] = useState("");
+  const [agenticMaxPages, setAgenticMaxPages] = useState(25);
+  const [agenticMaxDepth, setAgenticMaxDepth] = useState(2);
+  const [agenticLoading, setAgenticLoading] = useState(false);
+  const [agenticDiscovered, setAgenticDiscovered] = useState<string[]>([]);
+  const [agenticPages, setAgenticPages] = useState<Array<{ url: string; title: string | null; depth: number }>>([]);
+  const [agenticBrokenLinks, setAgenticBrokenLinks] = useState<Array<{ targetUrl: string; statusCode?: number }>>([]);
+
   const [deviceMode, setDeviceMode] = useState<"MOBILE" | "DESKTOP" | "BOTH">("BOTH");
 
   // Project state
@@ -158,6 +171,41 @@ export default function NewAuditPage() {
     setSitemapDiscovered(Array.from(new Set(combinedUrls)));
   };
 
+  // Run autonomous Agentic Crawler
+  const handleRunAgenticCrawl = async () => {
+    if (!agenticRootUrl) return;
+    setAgenticLoading(true);
+    setError(null);
+    setAgenticPages([]);
+    setAgenticDiscovered([]);
+    setAgenticBrokenLinks([]);
+
+    try {
+      const res = await fetch("/api/v1/crawl/agentic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rootUrl: agenticRootUrl,
+          maxPages: agenticMaxPages,
+          maxDepth: agenticMaxDepth,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Agentic crawl failed");
+      }
+
+      setAgenticPages(json.data.pages || []);
+      setAgenticDiscovered(json.urls || []);
+      setAgenticBrokenLinks(json.data.brokenLinks || []);
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setAgenticLoading(false);
+    }
+  };
+
   // Submit Audit
   const handleSubmitAudit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,7 +231,6 @@ export default function NewAuditPage() {
         if (parsed.validUrls.length === 0) {
           throw new Error("No valid URLs found in the text input.");
         }
-        // Filter out .xml sitemaps if accidentally pasted
         targetUrls = parsed.validUrls.filter((u) => !u.endsWith(".xml"));
         if (targetUrls.length === 0) {
           throw new Error("The submitted URLs appear to be XML sitemap files. Please use the 'XML Sitemap' tab.");
@@ -193,6 +240,11 @@ export default function NewAuditPage() {
           throw new Error("Please click 'Discover URLs' first so SpeedPilot can extract the web pages from the sitemap.");
         }
         targetUrls = sitemapDiscovered;
+      } else if (activeTab === "agentic") {
+        if (agenticDiscovered.length === 0) {
+          throw new Error("Please run the Agentic Crawler first by clicking 'Launch Agentic Crawl'.");
+        }
+        targetUrls = agenticDiscovered;
       }
 
       // 2. Ensure or create project
@@ -326,6 +378,14 @@ export default function NewAuditPage() {
                 className={`px-3 py-1 rounded transition ${activeTab === "sitemap" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >
                 XML Sitemap
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("agentic")}
+                className={`px-3 py-1 rounded transition flex items-center gap-1 ${activeTab === "agentic" ? "bg-card text-primary font-semibold shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Bot className="w-3.5 h-3.5 text-primary" />
+                Agentic Crawler
               </button>
             </div>
           </div>
@@ -501,6 +561,122 @@ export default function NewAuditPage() {
                         + {sitemapDiscovered.length - 15} more URLs ready for execution
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Agentic Autonomous Crawler Tab */}
+          {activeTab === "agentic" && (
+            <div className="space-y-4">
+              <div className="p-3.5 rounded-lg border border-primary/20 bg-primary/5 text-xs text-muted-foreground flex items-start gap-2.5">
+                <Compass className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-foreground">Autonomous Site Exploration</span>: SpeedPilot will crawl your homepage, follow genuine internal links, discover key conversion and content pages, and check for broken 404 links — no sitemap or URL list required!
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Seed Domain or Root URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="https://example.com"
+                    value={agenticRootUrl}
+                    onChange={(e) => setAgenticRootUrl(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-md border border-input bg-background text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRunAgenticCrawl}
+                    disabled={agenticLoading || !agenticRootUrl}
+                    className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+                  >
+                    {agenticLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
+                    Launch Agentic Crawl
+                  </button>
+                </div>
+              </div>
+
+              {/* Crawler Parameters */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                    Crawl Page Limit
+                  </label>
+                  <select
+                    value={agenticMaxPages}
+                    onChange={(e) => setAgenticMaxPages(Number(e.target.value))}
+                    className="w-full px-3 py-1.5 rounded-md border border-input bg-background text-xs"
+                  >
+                    <option value={15}>15 Pages (Fast reconnaissance)</option>
+                    <option value={25}>25 Pages (Recommended default)</option>
+                    <option value={50}>50 Pages (Deep content survey)</option>
+                    <option value={100}>100 Pages (Comprehensive crawl)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                    Max Link Depth
+                  </label>
+                  <select
+                    value={agenticMaxDepth}
+                    onChange={(e) => setAgenticMaxDepth(Number(e.target.value))}
+                    className="w-full px-3 py-1.5 rounded-md border border-input bg-background text-xs"
+                  >
+                    <option value={1}>1 Level (Root & main navigation only)</option>
+                    <option value={2}>2 Levels (Navigation + linked subpages)</option>
+                    <option value={3}>3 Levels (Deep recursive exploration)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Broken Links Alert if Found */}
+              {agenticBrokenLinks.length > 0 && (
+                <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/10 text-xs text-amber-500 space-y-1">
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    Agent Discovered {agenticBrokenLinks.length} Broken Internal Link(s) (404)
+                  </div>
+                  <div className="max-h-24 overflow-y-auto font-mono text-[11px] text-muted-foreground space-y-0.5">
+                    {agenticBrokenLinks.map((b, i) => (
+                      <div key={i} className="truncate text-rose-400">• {b.targetUrl} (Status {b.statusCode || "Failed"})</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Discovered Pages Tree */}
+              {agenticPages.length > 0 && (
+                <div className="p-3.5 rounded-lg border border-border bg-secondary/20 text-xs space-y-2.5">
+                  <div className="font-semibold text-emerald-500 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Agentic Discovery Complete: {agenticPages.length} Pages Found
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-normal">
+                      Ready for 1-Click Audit
+                    </span>
+                  </div>
+
+                  <div className="max-h-44 overflow-y-auto space-y-1.5 bg-background/50 p-2.5 rounded border border-border/50">
+                    {agenticPages.map((p, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-[11px]">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="px-1.5 py-0.2 rounded bg-secondary font-mono text-[10px] text-muted-foreground shrink-0">
+                            Depth {p.depth}
+                          </span>
+                          <span className="font-mono truncate">{p.url}</span>
+                        </div>
+                        {p.title && (
+                          <span className="text-muted-foreground/70 truncate text-[10px] max-w-[200px] shrink-0">
+                            {p.title}
+                          </span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
