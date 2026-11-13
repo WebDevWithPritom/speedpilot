@@ -9,6 +9,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@speedpilot/security": "^1.0.0",
     "@speedpilot/shared": "^1.0.0"
   },
   "devDependencies": {

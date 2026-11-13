@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@speedpilot/database";
+import { getCurrentUser } from "@/lib/auth";
 import { getOrCreateDefaultWorkspace } from "@/lib/db";
+import { LandingPage } from "@/components/landing/LandingPage";
 import { MetricBadge } from "@/components/ui/MetricBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
@@ -17,13 +19,19 @@ import {
 export const revalidate = 0; // Fresh real-time data
 
 export default async function DashboardPage() {
-  const workspace = await getOrCreateDefaultWorkspace();
+  const user = await getCurrentUser();
+  if (!user) {
+    return <LandingPage />;
+  }
+
+  // Use the JWT session workspaceId directly to eliminate an extra sequential DB roundtrip
+  const workspaceId = user.workspaceId || (await getOrCreateDefaultWorkspace()).id;
 
   const [projectCount, totalUrlsCount, recentJobs, allLighthouseScores] = await Promise.all([
-    prisma.project.count({ where: { workspaceId: workspace.id } }),
-    prisma.projectURL.count({ where: { project: { workspaceId: workspace.id } } }),
+    prisma.project.count({ where: { workspaceId } }),
+    prisma.projectURL.count({ where: { project: { workspaceId } } }),
     prisma.auditJob.findMany({
-      where: { workspaceId: workspace.id },
+      where: { workspaceId },
       take: 6,
       orderBy: { createdAt: "desc" },
       include: {
@@ -35,7 +43,7 @@ export default async function DashboardPage() {
       },
     }),
     prisma.lighthouseResult.findMany({
-      take: 100,
+      take: 50,
       select: { performanceScore: true, seoScore: true, lcpMs: true, tbtMs: true, cls: true },
     }),
   ]);

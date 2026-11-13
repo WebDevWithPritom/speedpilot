@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@speedpilot/database";
 import { getOrCreateDefaultWorkspace } from "@/lib/db";
-import { FileText, Download, Printer, ExternalLink, Zap } from "lucide-react";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { FileText, Zap } from "lucide-react";
+import { ReportsExportClient } from "@/components/reports/ReportsExportClient";
 
 export const revalidate = 0;
 
@@ -58,50 +58,19 @@ export default async function ReportsPage() {
           </Link>
         </div>
       ) : (
-        <div className="border border-border rounded-lg overflow-hidden bg-card shadow-sm divide-y divide-border">
-          {auditJobs.map((job) => (
-            <div
-              key={job.id}
-              className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-secondary/20 transition-colors"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-foreground">{job.project.name}</span>
-                  <span className="text-xs text-muted-foreground font-mono">({job.project.primaryDomain})</span>
-                  <StatusBadge status={job.status} />
-                </div>
-                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                  <span>{job._count.executions} audited execution(s)</span>
-                  <span>•</span>
-                  <span>Device: {job.deviceMode}</span>
-                  <span>•</span>
-                  <span>{new Date(job.createdAt).toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <a
-                  href={`/api/v1/reports/export?jobId=${job.id}&format=HTML`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-secondary transition flex items-center gap-1.5"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  Printable Executive Report (PDF)
-                </a>
-
-                <a
-                  href={`/api/v1/reports/export?jobId=${job.id}&format=CSV`}
-                  download
-                  className="px-3 py-1.5 rounded-md bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold transition flex items-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Export CSV
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
+        <ReportsExportClient
+          jobs={auditJobs.map((job) => ({
+            id: job.id,
+            deviceMode: job.deviceMode,
+            status: job.status,
+            createdAt: job.createdAt.toISOString(),
+            project: {
+              name: job.project.name,
+              primaryDomain: job.project.primaryDomain,
+            },
+            executionsCount: job._count.executions,
+          }))}
+        />
       )}
     </div>
   );

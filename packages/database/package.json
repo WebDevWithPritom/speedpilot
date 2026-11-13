@@ -7,6 +7,7 @@
     "build": "tsc",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
+    "push:vercel": "node push-vercel.mjs",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

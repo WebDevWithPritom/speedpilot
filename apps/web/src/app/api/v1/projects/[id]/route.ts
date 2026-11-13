@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@speedpilot/database";
+import { getOrCreateDefaultWorkspace } from "@/lib/db";
 
 export async function GET(
   _req: NextRequest,
@@ -7,8 +8,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const project = await prisma.project.findUnique({
-      where: { id },
+    const workspace = await getOrCreateDefaultWorkspace();
+    const project = await prisma.project.findFirst({
+      where: { id, workspaceId: workspace.id },
       include: {
         urls: {
           take: 100,
@@ -49,9 +51,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await prisma.project.delete({
-      where: { id },
+    const workspace = await getOrCreateDefaultWorkspace();
+    const deleted = await prisma.project.deleteMany({
+      where: { id, workspaceId: workspace.id },
     });
+    if (deleted.count === 0) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
     return NextResponse.json({ message: "Project deleted successfully" });
   } catch (error: unknown) {
     return NextResponse.json(

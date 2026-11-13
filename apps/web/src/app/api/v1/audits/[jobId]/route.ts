@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@speedpilot/database";
+import { getOrCreateDefaultWorkspace } from "@/lib/db";
 
 export async function GET(
   _req: NextRequest,
@@ -7,8 +8,9 @@ export async function GET(
 ) {
   try {
     const { jobId } = await params;
-    const job = await prisma.auditJob.findUnique({
-      where: { id: jobId },
+    const workspace = await getOrCreateDefaultWorkspace();
+    const job = await prisma.auditJob.findFirst({
+      where: { id: jobId, workspaceId: workspace.id },
       include: {
         project: { select: { id: true, name: true, primaryDomain: true } },
         executions: {

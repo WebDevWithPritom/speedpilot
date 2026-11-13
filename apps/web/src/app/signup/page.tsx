@@ -2,13 +2,13 @@
 
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Lock, Mail, User, Eye, EyeOff, AlertCircle, Loader2, ShieldCheck, Flame } from "lucide-react";
 
 function SignupForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get("redirect") || "/";
+  const rawRedirect = searchParams.get("redirect") || "/";
+  const redirectPath = rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -34,11 +34,9 @@ function SignupForm() {
         throw new Error(data.error || "Failed to create account.");
       }
 
-      router.push(redirectPath);
-      router.refresh();
+      window.location.assign(redirectPath);
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };

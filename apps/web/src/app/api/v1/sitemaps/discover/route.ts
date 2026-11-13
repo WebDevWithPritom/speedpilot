@@ -76,7 +76,7 @@ export interface DiscoveredChildSitemap {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { sitemapUrl, maxUrls = 50 } = await req.json();
+    const { sitemapUrl, maxUrls = 1000 } = await req.json();
 
     if (!sitemapUrl || typeof sitemapUrl !== "string") {
       return NextResponse.json({ error: "Sitemap URL is required" }, { status: 400 });
@@ -86,6 +86,8 @@ export async function POST(req: NextRequest) {
     if (!norm.isValid || !norm.normalizedUrl) {
       return NextResponse.json({ error: "Invalid sitemap URL syntax" }, { status: 400 });
     }
+
+    const parsedMax = maxUrls === "ALL" ? 10_000 : Math.min(10_000, Math.max(1, Number(maxUrls) || 1000));
 
     // SSRF-guarded fetch of root sitemap
     const rootResp = await safeFetch(norm.normalizedUrl, {
@@ -102,7 +104,7 @@ export async function POST(req: NextRequest) {
       // It's a sitemap index containing child sitemaps
       const rawChildUrls = extractLocs(rootXml);
 
-      for (const childUrl of rawChildUrls.slice(0, 10)) {
+      for (const childUrl of rawChildUrls.slice(0, 30)) {
         const childNorm = validateAndNormalizeUrl(childUrl);
         if (!childNorm.isValid || !childNorm.normalizedUrl) continue;
 
@@ -150,7 +152,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const allUrlsArray = Array.from(allDiscovered).slice(0, maxUrls);
+    const allUrlsArray = Array.from(allDiscovered).slice(0, parsedMax);
 
     return NextResponse.json({
       sitemapUrl: norm.normalizedUrl,

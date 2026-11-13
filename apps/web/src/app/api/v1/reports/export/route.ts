@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@speedpilot/database";
 import { generateAuditCSV, generateExecutiveHTMLReport, AuditReportData } from "@speedpilot/report-generator";
+import { getOrCreateDefaultWorkspace } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,13 +9,17 @@ export async function GET(req: NextRequest) {
     const jobId = searchParams.get("jobId");
     const format = (searchParams.get("format") || "HTML").toUpperCase();
     const companyName = searchParams.get("companyName") || "SpeedPilot Intelligence";
+    const rawColor = searchParams.get("primaryColor") || "#0f172a";
+    const primaryColor = /^#[0-9a-fA-F]{6}$/.test(rawColor) ? rawColor : "#0f172a";
+    const reportFooter = searchParams.get("reportFooter") || undefined;
 
     if (!jobId) {
       return NextResponse.json({ error: "jobId query parameter is required" }, { status: 400 });
     }
 
-    const job = await prisma.auditJob.findUnique({
-      where: { id: jobId },
+    const workspace = await getOrCreateDefaultWorkspace();
+    const job = await prisma.auditJob.findFirst({
+      where: { id: jobId, workspaceId: workspace.id },
       include: {
         project: true,
         executions: {
@@ -45,6 +50,8 @@ export async function GET(req: NextRequest) {
       deviceMode: job.deviceMode,
       whiteLabel: {
         companyName,
+        primaryColor,
+        reportFooter,
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       executions: job.executions.map((e: any) => ({

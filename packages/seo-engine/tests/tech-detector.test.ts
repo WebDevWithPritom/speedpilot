@@ -71,5 +71,30 @@ describe("Technology Framework Detection", () => {
     const res = detectTechStack(plainHtml);
     expect(res.detectedStack).toBe("UNKNOWN");
   });
+
+  it("should extract sub-stacks (plugins/CDN), existing head hints, and response headers", () => {
+    const wpLiteSpeedHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <link rel="preload" as="font" href="/wp-content/themes/Divi/fonts/main.woff2">
+        <link rel="stylesheet" href="/wp-content/litespeed/css/bundle.css">
+      </head>
+      <body class="et_pb_section"></body>
+      </html>
+    `;
+    const headers = new Headers({
+      server: "cloudflare",
+      "cf-ray": "abc123",
+      "content-encoding": "br",
+      "cache-control": "public, max-age=3600",
+    });
+    const res = detectTechStack(wpLiteSpeedHtml, headers);
+    expect(res.detectedStack).toBe("WORDPRESS");
+    expect(res.subStacks).toEqual(expect.arrayContaining(["LiteSpeed Cache", "Divi Theme", "Cloudflare CDN"]));
+    expect(res.existingHints).toContain("/wp-content/themes/Divi/fonts/main.woff2");
+    expect(res.responseHeaders.contentEncoding).toBe("br");
+    expect(res.responseHeaders.server).toBe("cloudflare");
+  });
 });
 

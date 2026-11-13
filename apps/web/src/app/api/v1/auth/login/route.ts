@@ -12,63 +12,9 @@ export const revalidate = 0;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password, isGuestDemo } = body;
+    const { email, password } = body;
 
-    let targetEmail = (email || "").trim().toLowerCase();
-
-    // Guest / Streamer Demo 1-Click Login support
-    if (isGuestDemo) {
-      targetEmail = "streamer-demo@speedpilot.test";
-      let demoUser = await prisma.user.findUnique({
-        where: { email: targetEmail },
-      });
-
-      if (!demoUser) {
-        demoUser = await prisma.user.create({
-          data: {
-            email: targetEmail,
-            name: "Demo Creator (Pro Tier)",
-          },
-        });
-      }
-
-      const wsInfo = await getOrCreateUserWorkspace(demoUser);
-
-      const token = await signAuthToken({
-        userId: demoUser.id,
-        email: demoUser.email,
-        name: demoUser.name || "Demo Creator",
-        role: wsInfo.role,
-        workspaceId: wsInfo.workspaceId,
-        workspaceName: wsInfo.workspaceName,
-        tier: "PRO", // demo has Pro privileges
-      });
-
-      const response = NextResponse.json({
-        success: true,
-        user: {
-          id: demoUser.id,
-          email: demoUser.email,
-          name: demoUser.name,
-          role: wsInfo.role,
-          workspaceId: wsInfo.workspaceId,
-          workspaceName: wsInfo.workspaceName,
-          tier: "PRO",
-        },
-      });
-
-      response.cookies.set({
-        name: AUTH_COOKIE_NAME,
-        value: token,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 14,
-        path: "/",
-      });
-
-      return response;
-    }
+    const targetEmail = (email || "").trim().toLowerCase();
 
     if (!targetEmail || !targetEmail.includes("@")) {
       return NextResponse.json(
@@ -104,6 +50,19 @@ export async function POST(req: NextRequest) {
     }
 
     const wsInfo = await getOrCreateUserWorkspace(user);
+
+    // Asynchronously log activity without blocking the user response
+    prisma.activityLog
+      .create({
+        data: {
+          userId: user.id,
+          action: "USER_LOGIN",
+          entityType: "User",
+          entityId: user.id,
+          metadata: { workspaceId: wsInfo.workspaceId },
+        },
+      })
+      .catch((err) => console.error("[ActivityLog]", err));
 
     const token = await signAuthToken({
       userId: user.id,

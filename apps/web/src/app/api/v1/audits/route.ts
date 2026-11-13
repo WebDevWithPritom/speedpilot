@@ -1,9 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@speedpilot/database";
+
+export const maxDuration = 60;
 import { TriggerAuditSchema, validateAndNormalizeUrl, TechStack } from "@speedpilot/shared";
 import { PageSpeedClient } from "@speedpilot/pagespeed";
 import { crawlAndInspectSEO } from "@speedpilot/seo-engine";
-import { generateAIFixRecommendation } from "@speedpilot/ai-engine";
+import { generateAIFixRecommendation, computeIssueSignature } from "@speedpilot/ai-engine";
+import { getOrCreateDefaultWorkspace } from "@/lib/db";
 
 const psiClient = new PageSpeedClient();
 
@@ -17,6 +20,8 @@ async function executeAuditAsync(
     googleKey?: string;
     aiKey?: string;
     aiProvider?: string;
+    aiModel?: string;
+    aiBaseUrl?: string;
   }
 ) {
   const startTime = Date.now();
@@ -30,17 +35,14 @@ async function executeAuditAsync(
       ? new PageSpeedClient({ apiKey: customKeys.googleKey })
       : psiClient;
 
-    const psiResult = await activeClient.runAudit(url, device);
+    // Run PSI Audit and Technical SEO Crawl concurrently for maximum speed
+    const [psiResult, crawlResult] = await Promise.all([
+      activeClient.runAudit(url, device),
+      crawlAndInspectSEO(url).catch(() => null),
+    ]);
 
-    let seoInspection = null;
-    let detectedStack: TechStack = "UNKNOWN";
-    try {
-      const crawlResult = await crawlAndInspectSEO(url);
-      seoInspection = crawlResult.inspection;
-      detectedStack = crawlResult.techDetection.detectedStack;
-    } catch {
-      // SEO crawl might encounter strict firewalls
-    }
+    const seoInspection = crawlResult?.inspection ?? null;
+    const detectedStack: TechStack = crawlResult?.techDetection?.detectedStack ?? "UNKNOWN";
 
     await prisma.auditExecution.update({
       where: { id: executionId },
@@ -136,40 +138,84 @@ async function executeAuditAsync(
       }
     }
 
-    for (const issue of allIssuesToPersist) {
-      const createdIssue = await prisma.auditIssue.create({
-        data: {
-          auditExecutionId: executionId,
-          code: issue.code,
-          title: issue.title,
-          category: issue.category,
-          severity: issue.severity,
-          displayValue: issue.displayValue,
-          evidenceDetails: issue.evidenceDetails,
-        },
-      });
+    // 4. Concurrently persist Issues & generate AI recommendations
+    const createdIssues = await Promise.all(
+      allIssuesToPersist.map((issue) =>
+        prisma.auditIssue.create({
+          data: {
+            auditExecutionId: executionId,
+            code: issue.code,
+            title: issue.title,
+            category: issue.category,
+            severity: issue.severity,
+            displayValue: issue.displayValue,
+            evidenceDetails: issue.evidenceDetails,
+          },
+        })
+      )
+    );
 
-      if (issue.severity === "HIGH" || issue.severity === "CRITICAL") {
+    const sevRank: Record<string, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+    const aiSynthTasks = createdIssues
+      .map((created, i) => ({ created, raw: allIssuesToPersist[i] }))
+      .filter((p) => Boolean(p.raw))
+      .sort((a, b) => (sevRank[b.raw.severity] || 0) - (sevRank[a.raw.severity] || 0))
+      .slice(0, 15);
+
+    await Promise.allSettled(
+      aiSynthTasks.map(async ({ created, raw }) => {
         try {
+          const sig = computeIssueSignature(raw.code, detectedStack, raw.evidenceDetails?.[0]?.url);
+          const cached = await prisma.aIRecommendation.findFirst({
+            where: { signatureHash: sig },
+          });
+
+          if (cached) {
+            await prisma.aIRecommendation.create({
+              data: {
+                auditIssueId: created.id,
+                detectedStack: cached.detectedStack,
+                explanationMarketer: cached.explanationMarketer,
+                explanationDeveloper: cached.explanationDeveloper,
+                explanationAgency: cached.explanationAgency,
+                explanationSaaSTeam: cached.explanationSaaSTeam,
+                remediationCodeSnippet: cached.remediationCodeSnippet,
+                implementationSteps: cached.implementationSteps as any,
+                verificationSteps: cached.verificationSteps as any,
+                estimatedDifficulty: cached.estimatedDifficulty,
+                estimatedImpact: cached.estimatedImpact,
+                promptTokens: 0,
+                completionTokens: 0,
+                signatureHash: sig,
+              },
+            });
+            return;
+          }
+
           const ai = await generateAIFixRecommendation({
             targetUrl: url,
             techStack: detectedStack,
+            subStacks: crawlResult?.techDetection?.subStacks,
+            existingHints: crawlResult?.techDetection?.existingHints,
+            responseHeaders: crawlResult?.techDetection?.responseHeaders,
             issue: {
-              code: issue.code,
-              title: issue.title,
-              category: issue.category,
-              severity: issue.severity,
-              displayValue: issue.displayValue,
+              code: raw.code,
+              title: raw.title,
+              category: raw.category,
+              severity: raw.severity,
+              displayValue: raw.displayValue,
               score: 0.5,
-              evidenceItems: issue.evidenceDetails,
+              evidenceItems: raw.evidenceDetails,
             },
             apiKey: customKeys?.aiKey,
             provider: (customKeys?.aiProvider as any) || "AUTO",
+            baseUrl: customKeys?.aiBaseUrl,
+            model: customKeys?.aiModel,
           });
 
           await prisma.aIRecommendation.create({
             data: {
-              auditIssueId: createdIssue.id,
+              auditIssueId: created.id,
               detectedStack: ai.recommendation.detectedStack,
               explanationMarketer: ai.recommendation.explanationMarketer,
               explanationDeveloper: ai.recommendation.explanationDeveloper,
@@ -188,8 +234,8 @@ async function executeAuditAsync(
         } catch {
           // Continue
         }
-      }
-    }
+      })
+    );
 
     const executionTimeMs = Date.now() - startTime;
 
@@ -250,7 +296,9 @@ async function executeAuditAsync(
 
 export async function GET() {
   try {
+    const workspace = await getOrCreateDefaultWorkspace();
     const jobs = await prisma.auditJob.findMany({
+      where: { workspaceId: workspace.id },
       orderBy: { createdAt: "desc" },
       take: 20,
       include: {
@@ -285,9 +333,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { projectId, deviceMode, urls } = parsed.data;
+    const workspace = await getOrCreateDefaultWorkspace();
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, workspaceId: workspace.id },
     });
 
     if (!project) {
@@ -310,17 +359,20 @@ export async function POST(req: NextRequest) {
     const customGoogleKey = req.headers.get("x-custom-google-key") || undefined;
     const customAiKey = req.headers.get("x-custom-ai-key") || undefined;
     const customAiProvider = req.headers.get("x-custom-ai-provider") || undefined;
+    const customAiModel = req.headers.get("x-custom-ai-model") || undefined;
+    const customAiBaseUrl = req.headers.get("x-custom-ai-base-url") || undefined;
 
     if (normalizedList.length === 0) {
       return NextResponse.json({ error: "No valid URLs provided" }, { status: 400 });
     }
 
     // Tier enforcement:
-    // Free community tier is limited to 5 URLs per bulk job unless they bring their own Google API key
-    if (userTier === "FREE" && !customGoogleKey && normalizedList.length > 5) {
+    // If the server has a platform key configured or user provides their own, allow large bulk audits
+    const hasPlatformKey = Boolean(process.env.GOOGLE_PAGESPEED_API_KEY);
+    if (!hasPlatformKey && userTier === "FREE" && !customGoogleKey && normalizedList.length > 5) {
       return NextResponse.json(
         {
-          error: "Free community tier is limited to 5 URLs per bulk audit to conserve shared API quotas. Add your own free Google PageSpeed API key in Settings or upgrade to Pro for unlimited bulk audits.",
+          error: "Free community tier without API keys is limited to 5 URLs per bulk audit. Add your own free Google PageSpeed API key in Settings or upgrade to Pro for unlimited bulk audits.",
           code: "TIER_LIMIT_REACHED",
           upgradeRequired: true,
           limit: 5,
@@ -385,41 +437,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Trigger async processing in background using controlled concurrency queue
-    // Google PageSpeed Insights performs best with 3-4 parallel browser sessions
-    const CONCURRENCY_LIMIT = 3;
-    (async () => {
-      let taskIndex = 0;
-      async function runWorker() {
-        while (taskIndex < executionTasks.length) {
-          const currentTask = executionTasks[taskIndex++];
-          if (!currentTask) break;
-          try {
-            await executeAuditAsync(
-              currentTask.executionId,
-              auditJob.id,
-              currentTask.url,
-              currentTask.device,
-              {
-                googleKey: customGoogleKey,
-                aiKey: customAiKey,
-                aiProvider: customAiProvider,
-              }
-            );
-          } catch (e) {
-            console.error(`Audit error for ${currentTask.url}:`, e);
+    // Trigger async processing in background using turbo parallel concurrency queue
+    // Using Next.js after() ensures Vercel Serverless keeps the function alive after 202 response
+    const CONCURRENCY_LIMIT = 8;
+    after(async () => {
+      try {
+        let taskIndex = 0;
+        async function runWorker() {
+          while (taskIndex < executionTasks.length) {
+            const currentTask = executionTasks[taskIndex++];
+            if (!currentTask) break;
+            try {
+              await executeAuditAsync(
+                currentTask.executionId,
+                auditJob.id,
+                currentTask.url,
+                currentTask.device,
+                {
+                  googleKey: customGoogleKey,
+                  aiKey: customAiKey,
+                  aiProvider: customAiProvider,
+                  aiModel: customAiModel,
+                  aiBaseUrl: customAiBaseUrl,
+                }
+              );
+            } catch (e) {
+              console.error(`Audit error for ${currentTask.url}:`, e);
+            }
+            // Ultra-brief pacing delay (50ms) between tasks to maximize throughput
+            await new Promise((r) => setTimeout(r, 50));
           }
-          // Brief pacing delay between tasks
-          await new Promise((r) => setTimeout(r, 250));
         }
-      }
 
-      const workers = Array.from(
-        { length: Math.min(CONCURRENCY_LIMIT, executionTasks.length) },
-        () => runWorker()
-      );
-      await Promise.all(workers);
-    })().catch(console.error);
+        const workers = Array.from(
+          { length: Math.min(CONCURRENCY_LIMIT, executionTasks.length) },
+          () => runWorker()
+        );
+        await Promise.all(workers);
+      } catch (err) {
+        console.error("Background audit runner error:", err);
+      }
+    });
 
     return NextResponse.json(
       {

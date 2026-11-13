@@ -2,18 +2,19 @@
 
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, Mail, Eye, EyeOff, Sparkles, AlertCircle, Loader2, ShieldCheck, Flame } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Lock, Mail, Eye, EyeOff, AlertCircle, Loader2, ShieldCheck, Flame } from "lucide-react";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get("redirect") || "/";
+  const rawRedirect = searchParams.get("redirect") || "/";
+  const redirectPath = rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,34 +34,12 @@ function LoginForm() {
         throw new Error(data.error || "Invalid credentials.");
       }
 
-      router.push(redirectPath);
-      router.refresh();
+      setRedirecting(true);
+      window.location.assign(redirectPath);
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGuestLogin = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isGuestDemo: true }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Demo login failed.");
-      }
-      router.push(redirectPath);
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      setRedirecting(false);
     }
   };
 
@@ -89,24 +68,6 @@ function LoginForm() {
           <span>{error}</span>
         </div>
       )}
-
-      {/* 1-Click Guest Pro Demo Button for Streamers & Devs */}
-      <button
-        type="button"
-        onClick={handleGuestLogin}
-        disabled={loading}
-        className="w-full py-2.5 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-xs font-semibold flex items-center justify-center gap-2 transition"
-      >
-        <Sparkles className="w-4 h-4 text-primary" />
-        <span>1-Click Demo Login (Instant Pro Access)</span>
-      </button>
-
-      <div className="relative flex items-center justify-center">
-        <div className="border-t border-border w-full" />
-        <span className="bg-card px-2 text-[10px] uppercase font-bold text-muted-foreground tracking-wider absolute">
-          Or with email
-        </span>
-      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
@@ -153,7 +114,14 @@ function LoginForm() {
           disabled={loading}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition flex items-center justify-center gap-2"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign In"}
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>{redirecting ? "Success! Loading dashboard..." : "Signing in..."}</span>
+            </>
+          ) : (
+            "Sign In"
+          )}
         </button>
       </form>
 

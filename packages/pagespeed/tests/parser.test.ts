@@ -108,5 +108,99 @@ describe("PageSpeed Response Parser", () => {
     expect(issue?.evidenceItems[0]?.url).toBe("https://example.com/styles.css");
     expect(issue?.evidenceItems[0]?.wastedMs).toBe(420);
   });
+
+  it("should parse Lighthouse 13 -insight audits, network chains, metricSavings, and DOM nodes", () => {
+    const lh13Payload = {
+      lighthouseResult: {
+        ...samplePSIResponse.lighthouseResult,
+        audits: {
+          ...samplePSIResponse.lighthouseResult.audits,
+          "render-blocking-insight": {
+            score: 0.4,
+            title: "Render blocking requests",
+            metricSavings: { LCP: 1200, FCP: 900 },
+            details: {
+              type: "table",
+              items: [{ url: "https://example.com/css/main.css", wastedMs: 950, totalBytes: 42000 }],
+            },
+          },
+          "network-dependency-tree-insight": {
+            score: 0,
+            title: "Network dependency tree",
+            details: {
+              type: "list",
+              items: [
+                {
+                  value: {
+                    type: "network-tree",
+                    chains: {
+                      root: {
+                        url: "https://fonts.googleapis.com/css2?family=Inter",
+                        transferSize: 1800,
+                        children: {
+                          leaf: { url: "https://fonts.gstatic.com/s/inter/v1.woff2", transferSize: 16400 },
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          "color-contrast": {
+            score: 0,
+            title: "Background and foreground colors do not have a sufficient contrast ratio.",
+            details: {
+              items: [
+                {
+                  node: {
+                    selector: "a.nav-muted",
+                    snippet: '<a class="nav-muted" href="/docs">Docs</a>',
+                    nodeLabel: "Docs",
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    const result = parseGooglePSIResponse(lh13Payload, "https://example.com", "MOBILE");
+    const codes = result.issues.map((i) => i.code);
+    expect(codes).toContain("render-blocking-insight");
+    expect(codes).toContain("network-dependency-tree-insight");
+    expect(codes).toContain("color-contrast");
+
+    const blockingInsight = result.issues.find((i) => i.code === "render-blocking-insight");
+    expect(blockingInsight?.severity).toBe("HIGH"); // 1200ms LCP metricSavings (> 600ms)
+    expect(blockingInsight?.evidenceItems[0]?.url).toBe("https://example.com/css/main.css");
+
+    const netTree = result.issues.find((i) => i.code === "network-dependency-tree-insight");
+    expect(netTree?.evidenceItems.map((e) => e.url)).toContain("https://fonts.gstatic.com/s/inter/v1.woff2");
+
+    const contrast = result.issues.find((i) => i.code === "color-contrast");
+    expect(contrast?.evidenceItems[0]?.selector).toBe("a.nav-muted");
+  });
+
+  it("should dynamically capture any failing Lighthouse audit from category auditRefs even if not hardcoded", () => {
+    const dynamicPayload = {
+      lighthouseResult: {
+        categories: {
+          performance: { score: 0.9, auditRefs: [] },
+          accessibility: { score: 1, auditRefs: [] },
+          "best-practices": { score: 0.75, auditRefs: [{ id: "csp-xss" }, { id: "errors-in-console" }] },
+          seo: { score: 1, auditRefs: [] },
+        },
+        audits: {
+          "csp-xss": { score: 0, title: "Ensure CSP is effective against XSS attacks" },
+          "errors-in-console": { score: 1, scoreDisplayMode: "binary", title: "Browser errors were logged to the console" },
+        },
+      },
+    };
+    const result = parseGooglePSIResponse(dynamicPayload, "https://example.com", "MOBILE");
+    expect(result.issues.map((i) => i.code)).toEqual(["csp-xss"]);
+    expect(result.issues[0]?.category).toBe("BEST_PRACTICES");
+  });
 });
 

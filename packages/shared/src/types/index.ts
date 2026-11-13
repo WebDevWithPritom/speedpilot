@@ -80,6 +80,44 @@ export interface SEOResultData {
   missingAltImagesCount: number;
   hasOpenGraph: boolean;
   hasStructuredData: boolean;
+
+  // Screaming Frog crawl & hygiene telemetry
+  internalLinksCount?: number;
+  externalLinksCount?: number;
+  nofollowLinksCount?: number;
+  h2Count?: number;
+  h3Count?: number;
+  wordCount?: number;
+  readingTimeMin?: number;
+  isIndexable?: boolean;
+  indexabilityReason?: string;
+  totalImagesCount?: number;
+
+  // Semrush On-Page SEO & SERP simulator
+  semrushScore?: number;
+  topKeywords?: Array<{
+    word: string;
+    count: number;
+    densityPercent: number;
+    inTitle: boolean;
+    inH1: boolean;
+  }>;
+  serpSnippetPreview?: {
+    pixelWidthEstimate: number;
+    isTitleTruncated: boolean;
+    previewUrlDisplay: string;
+    snippet: string;
+  };
+
+  // Ahrefs site health & schema telemetry
+  ahrefsHealthScore?: number;
+  schemaTypes?: string[];
+  openGraphData?: {
+    ogTitle?: string | null;
+    ogDescription?: string | null;
+    ogImage?: string | null;
+    twitterCard?: string | null;
+  };
 }
 
 export interface NormalizedAuditIssue {

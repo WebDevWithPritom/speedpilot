@@ -11,7 +11,7 @@ export function computeIssueSignature(
   primaryResource?: string
 ): string {
   const normalizedResource = primaryResource ? primaryResource.split("?")[0]?.toLowerCase() : "";
-  const input = `${issueCode.toLowerCase()}::${techStack}::${normalizedResource}`;
+  const input = `v2-lh13::${issueCode.toLowerCase()}::${techStack}::${normalizedResource}`;
   return crypto.createHash("sha256").update(input).digest("hex");
 }
 

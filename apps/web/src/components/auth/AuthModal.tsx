@@ -8,8 +8,6 @@ import {
   User,
   Eye,
   EyeOff,
-  Sparkles,
-  CheckCircle2,
   AlertCircle,
   Loader2,
   ShieldCheck,
@@ -54,29 +52,6 @@ export function AuthModal({ isOpen, onClose, onSuccess, initialMode = "LOGIN" }:
         throw new Error(data.error || "Authentication failed. Please try again.");
       }
 
-      if (onSuccess) onSuccess(data.user);
-      onClose();
-      window.location.reload();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGuestLogin = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isGuestDemo: true }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Guest login failed.");
-      }
       if (onSuccess) onSuccess(data.user);
       onClose();
       window.location.reload();
@@ -139,25 +114,6 @@ export function AuthModal({ isOpen, onClose, onSuccess, initialMode = "LOGIN" }:
           >
             Create Account
           </button>
-        </div>
-
-        {/* Quick 1-Click Guest / Creator Login */}
-        <button
-          type="button"
-          onClick={handleGuestLogin}
-          disabled={loading}
-          className="w-full py-2 px-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 text-xs font-semibold text-primary transition flex items-center justify-center gap-2"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>1-Click Instant Creator Login (Stream-Safe Pro)</span>
-        </button>
-
-        <div className="relative flex items-center justify-center">
-          <div className="border-t border-border w-full"></div>
-          <span className="bg-card px-2 text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-            Or with email
-          </span>
-          <div className="border-t border-border w-full"></div>
         </div>
 
         {/* Error Alert */}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "speedpilot-super-secure-production-jwt-token-secret-2026"
+  process.env.AUTH_SECRET || process.env.SESSION_SECRET || "speedpilot-dev-secret-change-in-production"
 );
 
 const AUTH_COOKIE_NAME = "sp_auth_token";
@@ -11,7 +11,11 @@ const AUTH_COOKIE_NAME = "sp_auth_token";
 const PUBLIC_PREFIXES = [
   "/login",
   "/signup",
+  "/features",
+  "/pricing",
+  "/admin",
   "/api/v1/auth",
+  "/api/v1/admin",
   "/api/v1/health",
   "/_next",
   "/favicon.ico",
@@ -20,10 +24,12 @@ const PUBLIC_PREFIXES = [
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // 1. Allow public routes without any check
-  const isPublic = PUBLIC_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
+  // 1. Allow public routes (and root landing page when unauthenticated) without any redirect
+  const isPublic =
+    pathname === "/" ||
+    PUBLIC_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    );
 
   // Extract auth token from cookie or Authorization Bearer header
   let token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
@@ -52,8 +58,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL(redirectUrl, req.url));
   }
 
-  // If public route, proceed
-  if (isPublic) {
+  // If public route and unauthenticated, proceed without auth headers
+  if (isPublic && !authPayload) {
     return NextResponse.next();
   }
 

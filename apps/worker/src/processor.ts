@@ -25,10 +25,16 @@ export async function processAuditJob(job: Job<AuditJobPayload>): Promise<void> 
     // 3. Run Static Technical SEO crawl
     let seoInspection = null;
     let detectedStack: TechStack = "UNKNOWN";
+    let techSubStacks: string[] = [];
+    let existingHints: string[] = [];
+    let responseHeaders: { cacheControl?: string; contentEncoding?: string; server?: string } = {};
     try {
       const crawlResult = await crawlAndInspectSEO(url);
       seoInspection = crawlResult.inspection;
       detectedStack = crawlResult.techDetection.detectedStack;
+      techSubStacks = crawlResult.techDetection.subStacks || [];
+      existingHints = crawlResult.techDetection.existingHints || [];
+      responseHeaders = crawlResult.techDetection.responseHeaders || {};
     } catch {
       // SEO crawl might fail on strict firewalls, but PSI may have succeeded
     }
@@ -141,12 +147,15 @@ export async function processAuditJob(job: Job<AuditJobPayload>): Promise<void> 
         },
       });
 
-      // Generate AI Fix for High and Critical issues
-      if (issue.severity === "HIGH" || issue.severity === "CRITICAL") {
+      // Generate AI Fix for up to top 15 issues cleanly across severities
+      if (allIssuesToPersist.indexOf(issue) < 15) {
         try {
           const aiResult = await generateAIFixRecommendation({
             targetUrl: url,
             techStack: detectedStack,
+            subStacks: techSubStacks,
+            existingHints,
+            responseHeaders,
             issue: {
               code: issue.code,
               title: issue.title,

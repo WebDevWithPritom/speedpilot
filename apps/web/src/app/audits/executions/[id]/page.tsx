@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -33,14 +33,31 @@ import {
   Sun,
   Activity,
   X,
+  TrendingUp,
+  Send,
+  Terminal,
+  ArrowRight,
+  RefreshCw,
 } from "lucide-react";
 import { MetricBadge } from "@/components/ui/MetricBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatMs } from "@/lib/utils";
+import { usePersona, Persona as AudienceMode } from "@/lib/persona";
+import { getClientAIConfig } from "@/lib/ai-config";
+import { DeepSearchModal } from "@/components/ai/DeepSearchModal";
+import { CodeDiffViewer } from "@/components/remediation/CodeDiffViewer";
 
-type AudienceMode = "DEVELOPER" | "MARKETER" | "AGENCY" | "SAAS_TEAM";
+const EXTERNAL_AI_PROVIDERS = [
+  { id: "chatgpt", label: "ChatGPT", prefill: true, buildUrl: (q: string) => `https://chatgpt.com/?q=${encodeURIComponent(q)}` },
+  { id: "claude", label: "Claude", prefill: true, buildUrl: (q: string) => `https://claude.ai/new?q=${encodeURIComponent(q)}` },
+  { id: "gemini", label: "Gemini", prefill: false, buildUrl: () => `https://gemini.google.com/app` },
+  { id: "perplexity", label: "Perplexity", prefill: true, buildUrl: (q: string) => `https://www.perplexity.ai/?q=${encodeURIComponent(q)}` },
+  { id: "grok", label: "Grok", prefill: true, buildUrl: (q: string) => `https://grok.com/?q=${encodeURIComponent(q)}` },
+  { id: "deepseek", label: "DeepSeek", prefill: false, buildUrl: () => `https://chat.deepseek.com/` },
+] as const;
 
 export default function ExecutionDeepDivePage() {
+  const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
 
@@ -49,17 +66,204 @@ export default function ExecutionDeepDivePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Audience presentation mode
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>("DEVELOPER");
+  // Audience presentation mode (synced globally across app)
+  const { persona: audienceMode, setPersona: changeAudienceMode } = usePersona();
+  const [activeDeepSearchIssue, setActiveDeepSearchIssue] = useState<any>(null);
   const [copiedCodeIndex, setCopiedCodeIndex] = useState<number | null>(null);
   const [agentTreeOpen, setAgentTreeOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [traceModalOpen, setTraceModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [synthesizingIssueId, setSynthesizingIssueId] = useState<string | null>(null);
+  const [synthesizingAll, setSynthesizingAll] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
+  const [githubRepoUrl, setGithubRepoUrl] = useState("");
+  const [pastedCode, setPastedCode] = useState("");
+  const [sourceFilename, setSourceFilename] = useState("");
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const synthesizeIssueFix = async (issueId: string) => {
+    setSynthesizingIssueId(issueId);
+    try {
+      const aiConfig = getClientAIConfig();
+      const res = await fetch(`/api/v1/audits/issues/${issueId}/synthesize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...aiConfig,
+          githubUrl: githubRepoUrl.trim() || undefined,
+          pastedCode: pastedCode.trim() || undefined,
+          sourceFilename: sourceFilename.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to generate AI fix");
+
+      setExecution((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          issues: (prev.issues || []).map((iss: any) =>
+            iss.id === issueId ? { ...iss, recommendations: [json.data] } : iss
+          ),
+        };
+      });
+      const ctxNote = json.codeOrigin && json.codeOrigin !== "NONE" ? ` (+ ${json.codeOrigin}: ${json.codeFilename})` : "";
+      showToast(`AI Fix generated via ${json.source}${ctxNote}`);
+    } catch (e: any) {
+      showToast(`Error: ${e.message}`);
+    } finally {
+      setSynthesizingIssueId(null);
+    }
+  };
+
+  const synthesizeAllIssues = async () => {
+    if (!execution?.issues?.length || synthesizingAll) return;
+    setSynthesizingAll(true);
+    const targets = execution.issues.slice(0, 15);
+    for (const iss of targets) {
+      await synthesizeIssueFix(iss.id);
+    }
+    setSynthesizingAll(false);
+    showToast(`Completed AI synthesis for ${targets.length} issue(s)`);
+  };
+
+  const buildIssuePrompt = (issue: any, shortForUrl = false) => {
+    const stack = issue.recommendations?.[0]?.detectedStack || "UNKNOWN";
+    const evList = (issue.evidenceDetails || [])
+      .slice(0, shortForUrl ? 5 : 10)
+      .map((e: any) => `- ${e.url || e.selector || e.description || "flagged item"}${e.wastedMs ? ` (${e.wastedMs}ms)` : ""}`)
+      .join("\n");
+    const codeSuffix =
+      !shortForUrl && pastedCode.trim()
+        ? `\n\nMy source code (${sourceFilename.trim() || "snippet"}):\n\`\`\`\n${pastedCode.trim().slice(0, 3500)}\n\`\`\``
+        : "";
+    return [
+      `Fix this Google PageSpeed / Lighthouse issue on ${execution?.url} (${execution?.device}, Stack: ${stack}).`,
+      `Issue: [${issue.code}] ${issue.title}${issue.displayValue ? ` — ${issue.displayValue}` : ""}`,
+      evList ? `Flagged evidence:\n${evList}` : "",
+      `Give exact copy-paste code using modern coding standards (tell me exact preload/preconnect/prefetch/defer/Cache-Control/WCAG tags only for these real files).${codeSuffix}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  };
+
+  const askExternalAI = (issue: any, provider?: (typeof EXTERNAL_AI_PROVIDERS)[number]) => {
+    const fullPrompt = buildIssuePrompt(issue, false);
+    navigator.clipboard?.writeText(fullPrompt).catch(() => {});
+    if (!provider) {
+      showToast("Prompt copied to clipboard — paste into any AI chat!");
+      return;
+    }
+    const urlPrompt = buildIssuePrompt(issue, true).slice(0, 1800);
+    window.open(provider.buildUrl(urlPrompt), "_blank", "noopener,noreferrer");
+    showToast(
+      provider.prefill
+        ? `Opened ${provider.label} with prompt pre-filled (and copied to clipboard)`
+        : `Prompt copied! Paste cleanly in the ${provider.label} tab`
+    );
+  };
+
+  const handleSwitchDevice = async (targetDevice: "MOBILE" | "DESKTOP") => {
+    if (!execution || execution.device === targetDevice) return;
+    if (execution.siblingExecution?.id) {
+      router.push(`/audits/executions/${execution.siblingExecution.id}`);
+      return;
+    }
+
+    // If sibling audit hasn't been run yet, trigger it on-demand for this URL
+    setLoading(true);
+    try {
+      showToast(`Initiating ${targetDevice} audit for this URL...`);
+      const customGoogleKey = typeof window !== "undefined" ? localStorage.getItem("sp_google_key") || "" : "";
+      const aiConfig = getClientAIConfig();
+      const res = await fetch("/api/v1/audits", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(customGoogleKey ? { "x-custom-google-key": customGoogleKey } : {}),
+          ...(aiConfig.apiKey ? { "x-custom-ai-key": aiConfig.apiKey } : {}),
+          ...(aiConfig.provider ? { "x-custom-ai-provider": aiConfig.provider } : {}),
+          ...(aiConfig.model ? { "x-custom-ai-model": aiConfig.model } : {}),
+          ...(aiConfig.baseUrl ? { "x-custom-ai-base-url": aiConfig.baseUrl } : {}),
+        },
+        body: JSON.stringify({
+          projectId: execution.auditJob?.project?.id,
+          deviceMode: targetDevice,
+          urls: [execution.url],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start companion audit");
+      router.push(`/audits/${data.jobId}`);
+    } catch (e: any) {
+      showToast(`Error: ${e.message}`);
+      setLoading(false);
+    }
+  };
+
+  const copyDevBrief = (issue: any, rec: any, idx: number) => {
+    const brief = `### 🚀 Performance Fix Brief (for Engineering)
+**Target URL:** ${execution.url}
+**Device Strategy:** ${execution.device}
+**Detected Stack:** ${rec?.detectedStack || "Web Standard"}
+**Bottleneck:** ${issue.title} (${issue.severity})
+**Business Impact:** ${rec?.explanationMarketer || issue.displayValue || "Performance degradation"}
+**Recommended Fix Checklist:**
+${rec?.implementationSteps?.map((s: string, i: number) => `${i + 1}. ${s}`).join("\n") || "Inspect asset delivery."}
+
+Generated by SpeedPilot Intelligence`;
+    navigator.clipboard.writeText(brief);
+    setCopiedCodeIndex(idx);
+    showToast("Developer Brief copied to clipboard!");
+    setTimeout(() => setCopiedCodeIndex(null), 2000);
+  };
+
+  const copyAgencyProposal = (issue: any, rec: any, idx: number) => {
+    const proposal = `### 💼 Client Optimization Deliverable
+**Client Target:** ${execution.url}
+**Finding:** ${issue.title}
+**Executive Summary:** ${rec?.explanationAgency || rec?.explanationMarketer}
+**Priority:** ${rec?.estimatedImpact || "HIGH"}
+**Estimated Scope:** ${rec?.estimatedDifficulty === "LOW" ? "1 - 2 Dev Hours (Quick Win)" : rec?.estimatedDifficulty === "MEDIUM" ? "2 - 4 Dev Hours" : "4 - 8 Dev Hours (Architecture Refactor)"}
+**Projected PageSpeed Gain:** +8 to +15 Points
+**Key Deliverables:**
+${rec?.implementationSteps?.map((s: string, i: number) => `- ${s}`).join("\n") || "- Refactor asset delivery"}
+
+Prepared via SpeedPilot Agency Suite`;
+    navigator.clipboard.writeText(proposal);
+    setCopiedCodeIndex(idx);
+    showToast("Client Proposal deliverable copied!");
+    setTimeout(() => setCopiedCodeIndex(null), 2000);
+  };
+
+  const copyJiraTicket = (issue: any, rec: any, idx: number) => {
+    const ticket = `## [PERF] ${issue.title} on ${execution.url}
+
+**User Story:**
+As a user visiting ${execution.url} on ${execution.device}, I want the main content to load without latency so that I can interact immediately.
+
+**Problem Statement:**
+${rec?.explanationSaaSTeam || rec?.explanationDeveloper}
+
+**Technical Details:**
+- **Severity:** ${issue.severity}
+- **Impact Metric:** ${rec?.estimatedImpact || "High"}
+- **Detected Stack:** ${rec?.detectedStack || "Standard"}
+
+**Acceptance Criteria:**
+${rec?.implementationSteps?.map((s: string) => `- [ ] ${s}`).join("\n") || "- [ ] Eliminate blocking resources"}
+- [ ] Verify Core Web Vitals pass in staging Lighthouse CI
+
+Generated by SpeedPilot SaaS Engine`;
+    navigator.clipboard.writeText(ticket);
+    setCopiedCodeIndex(idx);
+    showToast("Jira/Linear ticket copied!");
+    setTimeout(() => setCopiedCodeIndex(null), 2000);
   };
 
   useEffect(() => {
@@ -203,6 +407,13 @@ export default function ExecutionDeepDivePage() {
   const agentEvidence: any[] = Array.isArray(agentTreeIssue?.evidenceDetails)
     ? agentTreeIssue.evidenceDetails
     : [];
+  const agentScoreVal = lh?.agenticScore ?? 0;
+  const isAgentScoreFailing = lh?.agenticScore == null || agentScoreVal < 50;
+  const hasAgentTreeFailure = Boolean(agentTreeIssue) || agentEvidence.length > 0 || isAgentScoreFailing;
+  const webmcpIssues = issues.filter((i: any) =>
+    ["webmcp-form-coverage", "webmcp-registered-tools", "webmcp-schema-validity", "llms-txt", "ard-schema"].includes(i.code)
+  );
+  const isWebMcpMissing = webmcpIssues.length > 0 || isAgentScoreFailing;
 
   return (
     <div className="space-y-8">
@@ -354,6 +565,70 @@ export default function ExecutionDeepDivePage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Official Lighthouse Dual-Device Strategy Bar (Mobile <-> Desktop) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-card shadow-sm">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleSwitchDevice("MOBILE")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition ${
+              execution.device === "MOBILE"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Smartphone className="w-4 h-4" />
+            <span>Mobile</span>
+            {execution.device === "MOBILE" && lh?.performanceScore != null && (
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-primary-foreground/20 text-primary-foreground">
+                {lh.performanceScore}
+              </span>
+            )}
+            {execution.device !== "MOBILE" && execution.siblingExecution?.lighthouse?.performanceScore != null && (
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-background text-foreground border border-border">
+                {execution.siblingExecution.lighthouse.performanceScore}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSwitchDevice("DESKTOP")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition ${
+              execution.device === "DESKTOP"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Monitor className="w-4 h-4" />
+            <span>Desktop</span>
+            {execution.device === "DESKTOP" && lh?.performanceScore != null && (
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-primary-foreground/20 text-primary-foreground">
+                {lh.performanceScore}
+              </span>
+            )}
+            {execution.device !== "DESKTOP" && execution.siblingExecution?.lighthouse?.performanceScore != null && (
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-background text-foreground border border-border">
+                {execution.siblingExecution.lighthouse.performanceScore}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
+          {execution.siblingExecution ? (
+            <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Both Mobile & Desktop Audits Available
+            </span>
+          ) : (
+            <span className="text-muted-foreground">
+              Click the inactive tab to run a companion test for this URL
+            </span>
+          )}
         </div>
       </div>
 
@@ -514,46 +789,60 @@ export default function ExecutionDeepDivePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 rounded border border-border bg-secondary/20 space-y-1">
+            <div className={`p-3 rounded border space-y-1 ${seo.pageTitle ? "border-border bg-secondary/20" : "border-rose-500/40 bg-rose-500/5"}`}>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Page Title</span>
                 {seo.pageTitle ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-rose-500" />}
               </div>
-              <div className="font-semibold truncate" title={seo.pageTitle || "None"}>
+              <div className={`font-semibold truncate ${!seo.pageTitle ? "text-rose-500" : ""}`} title={seo.pageTitle || "None"}>
                 {seo.pageTitle || "Missing Title Tag"}
               </div>
               <div className="text-[11px] text-muted-foreground">{seo.titleLength ?? 0} characters</div>
             </div>
 
-            <div className="p-3 rounded border border-border bg-secondary/20 space-y-1">
+            <div className={`p-3 rounded border space-y-1 ${seo.metaDescription ? "border-border bg-secondary/20" : "border-rose-500/40 bg-rose-500/5"}`}>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Meta Description</span>
                 {seo.metaDescription ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-rose-500" />}
               </div>
-              <div className="font-semibold truncate" title={seo.metaDescription || "None"}>
+              <div className={`font-semibold truncate ${!seo.metaDescription ? "text-rose-500" : ""}`} title={seo.metaDescription || "None"}>
                 {seo.metaDescription || "Missing Description"}
               </div>
               <div className="text-[11px] text-muted-foreground">{seo.descriptionLength ?? 0} characters</div>
             </div>
 
-            <div className="p-3 rounded border border-border bg-secondary/20 space-y-1">
+            <div className={`p-3 rounded border space-y-1 ${seo.canonicalUrl ? "border-border bg-secondary/20" : "border-rose-500/40 bg-rose-500/5"}`}>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Canonical Check</span>
-                {seo.isCanonicalMatch ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <AlertTriangle className="w-4 h-4 text-amber-500" />}
+                {seo.isCanonicalMatch ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                ) : !seo.canonicalUrl ? (
+                  <XCircle className="w-4 h-4 text-rose-500" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                )}
               </div>
-              <div className="font-semibold truncate" title={seo.canonicalUrl || "None"}>
+              <div className={`font-semibold truncate ${!seo.canonicalUrl ? "text-rose-500" : ""}`} title={seo.canonicalUrl || "None"}>
                 {seo.canonicalUrl || "Missing Canonical"}
               </div>
-              <div className="text-[11px] text-muted-foreground">{seo.isCanonicalMatch ? "Matches target URL" : "Mismatch / Missing"}</div>
+              <div className="text-[11px] text-muted-foreground">{seo.isCanonicalMatch ? "Matches target URL" : !seo.canonicalUrl ? "Missing tag" : "Canonical mismatch"}</div>
             </div>
 
-            <div className="p-3 rounded border border-border bg-secondary/20 space-y-1">
+            <div className={`p-3 rounded border space-y-1 ${seo.h1Count === 0 ? "border-rose-500/40 bg-rose-500/5" : "border-border bg-secondary/20"}`}>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Headings & Images</span>
-                {seo.h1Count === 1 ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <AlertTriangle className="w-4 h-4 text-amber-500" />}
+                {seo.h1Count === 1 && seo.missingAltImagesCount === 0 ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                ) : seo.h1Count === 0 ? (
+                  <XCircle className="w-4 h-4 text-rose-500" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                )}
               </div>
-              <div className="font-semibold">{seo.h1Count} H1 Heading(s)</div>
-              <div className="text-[11px] text-muted-foreground">
+              <div className={`font-semibold ${seo.h1Count === 0 ? "text-rose-500" : ""}`}>
+                {seo.h1Count === 0 ? "Missing H1 Heading" : `${seo.h1Count} H1 Heading(s)`}
+              </div>
+              <div className={`text-[11px] ${seo.missingAltImagesCount > 0 ? "text-rose-500 font-medium" : "text-muted-foreground"}`}>
                 {seo.missingAltImagesCount > 0 ? `${seo.missingAltImagesCount} images missing alt` : "All images have alt text"}
               </div>
             </div>
@@ -566,24 +855,28 @@ export default function ExecutionDeepDivePage() {
         {/* Device Mode Strategy Indicator */}
         <div className="flex justify-center border-b border-border/60 pb-3">
           <div className="inline-flex items-center gap-8 text-sm font-medium">
-            <span
+            <button
+              type="button"
+              onClick={() => handleSwitchDevice("MOBILE")}
               className={`inline-flex items-center gap-1.5 pb-2 border-b-2 font-semibold transition ${
                 execution.device === "MOBILE"
                   ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground/50"
+                  : "border-transparent text-muted-foreground/60 hover:text-foreground"
               }`}
             >
               <Smartphone className="w-4 h-4" /> Mobile
-            </span>
-            <span
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSwitchDevice("DESKTOP")}
               className={`inline-flex items-center gap-1.5 pb-2 border-b-2 font-semibold transition ${
                 execution.device === "DESKTOP"
                   ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground/50"
+                  : "border-transparent text-muted-foreground/60 hover:text-foreground"
               }`}
             >
               <Monitor className="w-4 h-4" /> Desktop
-            </span>
+            </button>
           </div>
         </div>
 
@@ -592,17 +885,21 @@ export default function ExecutionDeepDivePage() {
           <div className="inline-flex items-center justify-center">
             <span
               className={`inline-flex items-center gap-2 px-5 py-1.5 rounded-full font-mono font-bold text-base border shadow-sm ${
-                (lh?.agenticScore ?? 0) >= 90
+                agentScoreVal >= 90
                   ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
-                  : "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                  : agentScoreVal >= 50
+                  ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                  : "bg-rose-500/10 text-rose-500 border-rose-500/30"
               }`}
             >
-              <span
-                className={`w-3 h-3 ${
-                  (lh?.agenticScore ?? 0) >= 90 ? "bg-emerald-500 rounded-full" : "bg-amber-500 rounded-xs"
-                }`}
-              />
-              {lh?.agenticRatio || `${lh?.agenticScore ?? 0}%`}
+              {agentScoreVal >= 90 ? (
+                <span className="w-3 h-3 bg-emerald-500 rounded-full" />
+              ) : agentScoreVal >= 50 ? (
+                <span className="w-3 h-3 bg-amber-500 rounded-xs" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-rose-500 fill-rose-500/15" />
+              )}
+              {lh?.agenticRatio || `${agentScoreVal}%`}
             </span>
           </div>
 
@@ -627,30 +924,55 @@ export default function ExecutionDeepDivePage() {
 
         {/* Section 1: Agent Accessibility */}
         <div className="space-y-3 pt-2">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            AGENT ACCESSIBILITY
+          <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+            <span>AGENT ACCESSIBILITY</span>
+            {hasAgentTreeFailure ? (
+              <span className="text-[10px] font-semibold text-rose-500">Action Required</span>
+            ) : (
+              <span className="text-[10px] font-semibold text-emerald-500">Verified</span>
+            )}
           </div>
 
-          <div className="border border-border rounded-lg overflow-hidden bg-secondary/10">
+          <div
+            className={`border rounded-lg overflow-hidden transition-colors ${
+              hasAgentTreeFailure
+                ? "border-rose-500/40 bg-rose-500/[0.03]"
+                : "border-emerald-500/30 bg-emerald-500/[0.02]"
+            }`}
+          >
             <button
               onClick={() => setAgentTreeOpen(!agentTreeOpen)}
-              className="w-full p-3.5 flex items-center justify-between text-left hover:bg-secondary/20 transition-colors"
+              className="w-full p-3.5 flex items-center justify-between text-left hover:bg-secondary/20 transition-colors gap-3"
             >
-              <div className="flex items-center gap-2">
-                {agentTreeIssue || agentEvidence.length > 0 ? (
-                  <AlertTriangle className="w-4 h-4 text-rose-500 fill-rose-500/15 shrink-0" />
+              <div className="flex items-center gap-2.5 min-w-0">
+                {hasAgentTreeFailure ? (
+                  <XCircle className="w-4 h-4 text-rose-500 shrink-0" />
                 ) : (
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                 )}
-                <span className="font-semibold text-sm text-foreground">
-                  {agentTreeIssue?.title || "Accessibility tree is not well-formed"}
+                <span className={`font-semibold text-sm truncate ${hasAgentTreeFailure ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}>
+                  {agentTreeIssue?.title ||
+                    (hasAgentTreeFailure
+                      ? "Accessibility tree is not well-formed or missing"
+                      : "Accessibility tree is well-formed")}
                 </span>
               </div>
-              {agentTreeOpen ? (
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              )}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                    hasAgentTreeFailure
+                      ? "bg-rose-500/10 text-rose-500 border-rose-500/30"
+                      : "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+                  }`}
+                >
+                  {hasAgentTreeFailure ? "Failed / Missing" : "Passed"}
+                </span>
+                {agentTreeOpen ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
             </button>
 
             {agentTreeOpen && (
@@ -670,9 +992,10 @@ export default function ExecutionDeepDivePage() {
 
                 {/* Subtable: Failed Audits */}
                 {agentEvidence.length > 0 ? (
-                  <div className="border border-border rounded-md overflow-hidden bg-card">
-                    <div className="px-3.5 py-2 bg-secondary/30 text-xs font-semibold text-foreground border-b border-border">
-                      Failed Audits
+                  <div className="border border-rose-500/30 rounded-md overflow-hidden bg-card">
+                    <div className="px-3.5 py-2 bg-rose-500/10 text-xs font-semibold text-rose-500 border-b border-rose-500/20 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>Failed Audits ({agentEvidence.length})</span>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-left border-collapse">
@@ -718,6 +1041,13 @@ export default function ExecutionDeepDivePage() {
                       </table>
                     </div>
                   </div>
+                ) : hasAgentTreeFailure ? (
+                  <div className="p-3.5 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs flex items-center gap-2">
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <span>
+                      Agentic accessibility checks did not pass ({agentScoreVal}% readiness). Ensure semantic HTML landmarks, explicit ARIA labels, and accessible form controls are present.
+                    </span>
+                  </div>
                 ) : (
                   <div className="p-3.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -740,16 +1070,47 @@ export default function ExecutionDeepDivePage() {
             <span className="text-[10px] text-primary font-mono">Chrome AI Standard</span>
           </div>
 
-          <div className="p-4 rounded-lg border border-border bg-card space-y-3">
-            <div className="flex items-center justify-between">
+          <div
+            className={`p-4 rounded-lg border space-y-3 ${
+              isWebMcpMissing
+                ? "border-rose-500/40 bg-rose-500/[0.03]"
+                : "border-emerald-500/30 bg-card"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Bot className="w-4 h-4 text-primary" />
+                <Bot className={`w-4 h-4 ${isWebMcpMissing ? "text-rose-500" : "text-primary"}`} />
                 <span className="font-semibold text-xs text-foreground">WebMCP Structured Tool Actions</span>
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                Recommended
-              </span>
+              {isWebMcpMissing ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-500 border border-rose-500/30">
+                  <XCircle className="w-3 h-3" /> Missing / Not Detected
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                  <CheckCircle2 className="w-3 h-3" /> Active & Valid
+                </span>
+              )}
             </div>
+
+            {webmcpIssues.length > 0 && (
+              <div className="space-y-1.5">
+                {webmcpIssues.map((wi: any) => (
+                  <div
+                    key={wi.id || wi.code}
+                    className="px-3 py-2 rounded bg-rose-500/10 border border-rose-500/25 text-xs text-rose-500 flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 font-medium">
+                      <XCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{wi.title}</span>
+                    </div>
+                    <span className="font-mono text-[10px] uppercase px-1.5 py-0.5 rounded bg-rose-500/15">
+                      Missing
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <p className="text-xs text-muted-foreground leading-relaxed">
               Valid <a href="https://developer.chrome.com/docs/ai/webmcp" target="_blank" rel="noreferrer" className="text-primary hover:underline font-medium">WebMCP schemas</a> enable AI agents to execute actions (such as searching, booking, or filtering) without scraping fragile CSS selectors.
@@ -793,57 +1154,141 @@ export default function ExecutionDeepDivePage() {
 
       {/* AI Fix Assistant Module (Audience-Aware Recommendations) */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-xl border border-border bg-card shadow-sm">
           <div>
-            <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
+            <h2 className="text-lg font-bold tracking-tight flex items-center gap-2 text-foreground">
               <Sparkles className="w-5 h-5 text-primary" />
-              AI Fix Assistant & Code Remediation
+              AI Fix Assistant & Strategy Engine
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Audience-tailored root causes, exact framework-specific code snippets, and verification steps.
+              Select your persona to adapt all insights, ROI models, code snippets, and handoff deliverables.
             </p>
           </div>
 
           {/* Audience Mode Switcher Tabs */}
-          <div className="flex bg-secondary p-1 rounded-md text-xs font-medium">
+          <div className="flex flex-wrap items-center bg-secondary/60 p-1 rounded-lg text-xs font-medium border border-border gap-1">
             <button
-              onClick={() => setAudienceMode("DEVELOPER")}
-              className={`px-3 py-1 rounded flex items-center gap-1.5 transition ${
-                audienceMode === "DEVELOPER" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={() => changeAudienceMode("DEVELOPER")}
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${
+                audienceMode === "DEVELOPER"
+                  ? "bg-card text-foreground shadow-sm font-semibold border border-border"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Code2 className="w-3.5 h-3.5" />
-              Developer
+              <Code2 className="w-3.5 h-3.5 text-blue-500" />
+              <span>Developer</span>
             </button>
             <button
-              onClick={() => setAudienceMode("MARKETER")}
-              className={`px-3 py-1 rounded flex items-center gap-1.5 transition ${
-                audienceMode === "MARKETER" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={() => changeAudienceMode("MARKETER")}
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${
+                audienceMode === "MARKETER"
+                  ? "bg-card text-foreground shadow-sm font-semibold border border-border"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Users className="w-3.5 h-3.5" />
-              Marketer
+              <Users className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Marketer</span>
             </button>
             <button
-              onClick={() => setAudienceMode("AGENCY")}
-              className={`px-3 py-1 rounded flex items-center gap-1.5 transition ${
-                audienceMode === "AGENCY" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={() => changeAudienceMode("AGENCY")}
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${
+                audienceMode === "AGENCY"
+                  ? "bg-card text-foreground shadow-sm font-semibold border border-border"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Briefcase className="w-3.5 h-3.5" />
-              Agency
+              <Briefcase className="w-3.5 h-3.5 text-purple-500" />
+              <span>Agency</span>
             </button>
             <button
-              onClick={() => setAudienceMode("SAAS_TEAM")}
-              className={`px-3 py-1 rounded flex items-center gap-1.5 transition ${
-                audienceMode === "SAAS_TEAM" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={() => changeAudienceMode("SAAS_TEAM")}
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${
+                audienceMode === "SAAS_TEAM"
+                  ? "bg-card text-foreground shadow-sm font-semibold border border-border"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Layers className="w-3.5 h-3.5" />
-              SaaS Team
+              <Layers className="w-3.5 h-3.5 text-amber-500" />
+              <span>SaaS Team</span>
             </button>
           </div>
         </div>
+
+        {/* Persona Role Banner */}
+        <div className="px-4 py-2.5 rounded-lg bg-secondary/30 border border-border flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-foreground uppercase tracking-wider text-[10px]">
+              Active Persona:
+            </span>
+            <span className="font-medium text-foreground">
+              {audienceMode === "DEVELOPER" && "Developer Mode — Simple Plain-English Fix Guide, Copy-Paste Code & Check Steps"}
+              {audienceMode === "MARKETER" && "Marketer Mode — How Speed Affects Traffic & Sales + 1-Click Dev Brief"}
+              {audienceMode === "AGENCY" && "Agency Mode — Client Summary, Time Estimate & Copy-Ready Proposal"}
+              {audienceMode === "SAAS_TEAM" && "SaaS Team Mode — User Impact, Speed Targets & Ready-to-Paste Jira/Linear Ticket"}
+            </span>
+          </div>
+          {issues.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setContextOpen((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-secondary text-foreground border border-border text-[11px] font-semibold hover:bg-secondary/80 transition"
+              >
+                <Code2 className="w-3 h-3" />
+                <span>{contextOpen ? "Hide Code Context" : "Add GitHub / Code Context"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={synthesizeAllIssues}
+                disabled={synthesizingAll}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-[11px] font-semibold hover:bg-primary/90 transition disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3 h-3 ${synthesizingAll ? "animate-spin" : ""}`} />
+                <span>{synthesizingAll ? "Synthesizing AI Fixes..." : "Synthesize All AI Fixes"}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {contextOpen && (
+          <div className="p-4 rounded-xl border border-primary/25 bg-primary/5 space-y-3 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-foreground">
+                Optional Source Code / Public GitHub Context (Boosts Fix Accuracy to ~90%+)
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Sent only when you click Generate / Synthesize All
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                type="url"
+                value={githubRepoUrl}
+                onChange={(e) => setGithubRepoUrl(e.target.value)}
+                placeholder="https://github.com/owner/repo or .../blob/main/app/layout.tsx"
+                className="w-full px-3 py-1.5 rounded-md border border-border bg-background text-xs font-mono"
+              />
+              <input
+                type="text"
+                value={sourceFilename}
+                onChange={(e) => setSourceFilename(e.target.value)}
+                placeholder="Filename hint if pasting code (e.g. functions.php, app/layout.tsx)"
+                className="w-full px-3 py-1.5 rounded-md border border-border bg-background text-xs font-mono"
+              />
+            </div>
+            <textarea
+              rows={4}
+              value={pastedCode}
+              onChange={(e) => setPastedCode(e.target.value)}
+              placeholder="Or paste your local file / <head> / next.config.mjs / functions.php here (ideal for private/local codebases)..."
+              className="w-full px-3 py-2 rounded-md border border-border bg-background text-xs font-mono"
+            />
+          </div>
+        )}
 
         {issues.length === 0 ? (
           <div className="p-8 text-center border border-dashed border-border rounded-lg bg-card/40">
@@ -858,24 +1303,15 @@ export default function ExecutionDeepDivePage() {
             {issues.map((issue: any, idx: number) => {
               const rec = issue.recommendations?.[0];
 
-              // Pick audience-specific explanation
-              const explanation =
-                audienceMode === "DEVELOPER"
-                  ? rec?.explanationDeveloper
-                  : audienceMode === "MARKETER"
-                  ? rec?.explanationMarketer
-                  : audienceMode === "AGENCY"
-                  ? rec?.explanationAgency
-                  : rec?.explanationSaaSTeam;
-
               return (
                 <div
                   key={issue.id}
-                  className="p-5 rounded-lg border border-border bg-card shadow-sm space-y-4"
+                  className="p-5 rounded-xl border border-border bg-card shadow-sm space-y-4"
                 >
+                  {/* Common Issue Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm text-foreground">{issue.title}</span>
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider uppercase ${
@@ -889,44 +1325,392 @@ export default function ExecutionDeepDivePage() {
                           {issue.severity}
                         </span>
                         {rec?.detectedStack && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary text-foreground">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary text-foreground border border-border">
                             Stack: {rec.detectedStack}
                           </span>
                         )}
                       </div>
                       {issue.displayValue && (
-                        <p className="text-xs text-emerald-500 font-medium">{issue.displayValue}</p>
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                          Potential Savings: {issue.displayValue}
+                        </p>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground font-mono">
                       <span>Impact: {rec?.estimatedImpact || "HIGH"}</span>
                       <span>•</span>
                       <span>Difficulty: {rec?.estimatedDifficulty || "MEDIUM"}</span>
+                      <button
+                        type="button"
+                        onClick={() => synthesizeIssueFix(issue.id)}
+                        disabled={synthesizingIssueId === issue.id || synthesizingAll}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-sans font-semibold border transition ${
+                          !rec
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
+                            : "bg-secondary hover:bg-secondary/80 text-foreground border-border"
+                        } disabled:opacity-50`}
+                      >
+                        <RefreshCw className={`w-3 h-3 ${synthesizingIssueId === issue.id ? "animate-spin" : ""}`} />
+                        {synthesizingIssueId === issue.id
+                          ? "Generating..."
+                          : rec
+                          ? "Regenerate AI Fix"
+                          : "Generate AI Fix"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveDeepSearchIssue(issue)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-sans font-semibold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 transition shadow-xs"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        AI Deep Search
+                      </button>
                     </div>
                   </div>
 
-                  {/* Audience-Specific Explanation */}
-                  <div className="text-xs text-foreground/90 leading-relaxed bg-secondary/30 p-3.5 rounded-md border border-border">
-                    <div className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
-                      {audienceMode} Perspective
-                    </div>
-                    {explanation || "SpeedPilot is analyzing recommendations for this finding."}
+                  {/* Ask Free Web AI Providers (Zero API Keys Required) */}
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] bg-secondary/25 px-3 py-2 rounded-lg border border-border/70">
+                    <span className="font-semibold text-muted-foreground mr-1">
+                      Ask Free Web AI (No Key):
+                    </span>
+                    {EXTERNAL_AI_PROVIDERS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => askExternalAI(issue, p)}
+                        title={p.prefill ? `Open ${p.label} with pre-filled prompt` : `Copy prompt & open ${p.label}`}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-card hover:bg-secondary text-foreground border border-border transition font-medium"
+                      >
+                        <span>{p.label}</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => askExternalAI(issue)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-card hover:bg-secondary text-muted-foreground hover:text-foreground border border-border transition ml-auto"
+                    >
+                      <Copy className="w-2.5 h-2.5" />
+                      <span>Copy Prompt</span>
+                    </button>
                   </div>
 
-                  {/* Offending Assets / Evidence */}
+                  {/* 1. DEVELOPER VIEW */}
+                  {audienceMode === "DEVELOPER" && (
+                    <div className="space-y-4">
+                      <div className="text-xs text-foreground/90 leading-relaxed bg-blue-500/5 p-4 rounded-lg border border-blue-500/20 space-y-2">
+                        <div className="font-semibold text-[11px] text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Code2 className="w-3.5 h-3.5" />
+                          What&apos;s Slow &amp; How to Fix It (Plain-English Dev Guide)
+                        </div>
+                        <p>
+                          {rec?.explanationDeveloper ||
+                            "This asset is slowing down how fast the page appears on screen. Click 'Generate AI Fix' above for tailored copy-paste code, or check the offending file list below."}
+                        </p>
+                      </div>
+
+                      {/* 1-Click Git Diff & AST Remediation Patch Studio */}
+                      <CodeDiffViewer
+                        issueTitle={issue.title}
+                        issueKey={issue.id}
+                        detectedStack={rec?.detectedStack || "NEXT_JS"}
+                        rawSnippet={rec?.remediationCodeSnippet || ""}
+                        url={execution.url}
+                        evidenceUrl={issue.evidenceDetails?.[0]?.url}
+                        potentialSavings={issue.displayValue}
+                      />
+
+                      {/* Developer Implementation & Verification Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div className="p-3.5 rounded-lg border border-border bg-card space-y-2">
+                          <div className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+                            Step-by-Step Fix Checklist
+                          </div>
+                          <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                            {rec?.implementationSteps?.map((s: string, i: number) => (
+                              <li key={i}>{s}</li>
+                            )) || <li>Open the slow file listed below and defer or compress it so it loads after the page draws.</li>}
+                          </ul>
+                        </div>
+
+                        <div className="p-3.5 rounded-lg border border-border bg-card space-y-2">
+                          <div className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+                            How to Verify Your Fix Worked
+                          </div>
+                          <div className="p-2.5 rounded bg-zinc-950 font-mono text-[11px] text-emerald-400 border border-zinc-800 break-all select-all">
+                            npx lighthouse-ci collect --url=&quot;{execution.url}&quot;
+                          </div>
+                          <ul className="list-disc list-inside space-y-1 text-muted-foreground text-[11px] pt-1">
+                            {rec?.verificationSteps?.map((v: string, i: number) => (
+                              <li key={i}>{v}</li>
+                            )) || <li>Re-run this URL in SpeedPilot after deploying and confirm the warning disappears.</li>}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. MARKETER VIEW */}
+                  {audienceMode === "MARKETER" && (
+                    <div className="space-y-4">
+                      {/* Plain English Business Summary */}
+                      <div className="text-xs text-foreground/90 leading-relaxed bg-emerald-500/5 p-4 rounded-lg border border-emerald-500/20 space-y-2">
+                        <div className="font-semibold text-[11px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5" />
+                          Plain-English Business Impact
+                        </div>
+                        <p className="text-sm font-medium text-foreground">
+                          {rec?.explanationMarketer || "This issue slows down your website, causing visitors to bounce before content is readable."}
+                        </p>
+                      </div>
+
+                      {/* Marketing ROI & Google Ranking Signals Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="p-3.5 rounded-lg border border-border bg-secondary/30 space-y-1">
+                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                            <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                            Conversion Impact
+                          </div>
+                          <div className="text-sm font-bold text-foreground">+3% to +7%</div>
+                          <p className="text-[11px] text-muted-foreground">Projected conversion lift on mobile checkout</p>
+                        </div>
+
+                        <div className="p-3.5 rounded-lg border border-border bg-secondary/30 space-y-1">
+                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                            <Search className="w-3.5 h-3.5 text-blue-500" />
+                            Google SEO Ranking
+                          </div>
+                          <div className="text-sm font-bold text-foreground">Page Experience Signal</div>
+                          <p className="text-[11px] text-muted-foreground">Affects mobile search rank & Core Web Vitals pass</p>
+                        </div>
+
+                        <div className="p-3.5 rounded-lg border border-border bg-secondary/30 space-y-1">
+                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5 text-amber-500" />
+                            Bounce Rate Risk
+                          </div>
+                          <div className="text-sm font-bold text-amber-500">~{issue.displayValue || "Moderate"} Delay</div>
+                          <p className="text-[11px] text-muted-foreground">Mobile visitors abandon pages taking &gt; 3 seconds</p>
+                        </div>
+                      </div>
+
+                      {/* Marketer Action Steps */}
+                      {Array.isArray(rec?.implementationSteps) && rec.implementationSteps.length > 0 && (
+                        <div className="p-3.5 rounded-lg border border-border bg-secondary/20 text-xs space-y-1.5">
+                          <div className="font-semibold text-[11px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                            Recommended Growth &amp; CMS Solutions
+                          </div>
+                          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                            {rec.implementationSteps.map((s: string, i: number) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* 1-Click Developer Handoff Brief */}
+                      <div className="p-4 rounded-lg border border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <div className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                            <Send className="w-3.5 h-3.5 text-primary" />
+                            Copy Developer Handoff Brief
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Copy a ready-to-send brief to paste into Slack, Teams, or email for your web developer.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyDevBrief(issue, rec, idx)}
+                          className="px-3.5 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition flex items-center gap-1.5 shrink-0"
+                        >
+                          {copiedCodeIndex === idx ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" /> Brief Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" /> Copy Dev Brief
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. AGENCY VIEW */}
+                  {audienceMode === "AGENCY" && (
+                    <div className="space-y-4">
+                      <div className="text-xs text-foreground/90 leading-relaxed bg-purple-500/5 p-4 rounded-lg border border-purple-500/20 space-y-2">
+                        <div className="font-semibold text-[11px] text-purple-600 dark:text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Briefcase className="w-3.5 h-3.5" />
+                          Client-Ready Executive Deliverable
+                        </div>
+                        <p className="text-sm font-medium text-foreground">
+                          {rec?.explanationAgency || "Recommended high-impact deliverable to present in client optimization proposals."}
+                        </p>
+                      </div>
+
+                      {/* Effort vs Impact Matrix */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="p-3 rounded-lg border border-border bg-card space-y-0.5">
+                          <span className="text-muted-foreground text-[10px] uppercase font-semibold">Priority</span>
+                          <div className="font-bold text-foreground">{rec?.estimatedImpact || "HIGH"}</div>
+                        </div>
+
+                        <div className="p-3 rounded-lg border border-border bg-card space-y-0.5">
+                          <span className="text-muted-foreground text-[10px] uppercase font-semibold">Billable Dev Hours</span>
+                          <div className="font-bold text-foreground">
+                            {rec?.estimatedDifficulty === "LOW" ? "1 - 2 Hours" : rec?.estimatedDifficulty === "MEDIUM" ? "2 - 4 Hours" : "4 - 8 Hours"}
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-lg border border-border bg-card space-y-0.5">
+                          <span className="text-muted-foreground text-[10px] uppercase font-semibold">Projected Score Lift</span>
+                          <div className="font-bold text-emerald-500">+8 to +15 Pts</div>
+                        </div>
+
+                        <div className="p-3 rounded-lg border border-border bg-card space-y-0.5">
+                          <span className="text-muted-foreground text-[10px] uppercase font-semibold">Scope Classification</span>
+                          <div className="font-bold text-foreground">
+                            {rec?.estimatedDifficulty === "LOW" ? "Quick Win" : "Core Refactor"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Scope Deliverables List */}
+                      {Array.isArray(rec?.implementationSteps) && rec.implementationSteps.length > 0 && (
+                        <div className="p-3.5 rounded-lg border border-border bg-secondary/20 text-xs space-y-1.5">
+                          <div className="font-semibold text-[11px] text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                            Client Scope &amp; Remediation Deliverables
+                          </div>
+                          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                            {rec.implementationSteps.map((s: string, i: number) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* 1-Click Client Proposal Deliverable */}
+                      <div className="p-4 rounded-lg border border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <div className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                            <Briefcase className="w-3.5 h-3.5 text-purple-500" />
+                            Client Proposal Snippet
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Copy this deliverable formatted for client proposals, pitch decks, and invoices.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyAgencyProposal(issue, rec, idx)}
+                          className="px-3.5 py-1.5 rounded-md bg-secondary hover:bg-secondary/80 border border-border text-foreground text-xs font-semibold transition flex items-center gap-1.5 shrink-0"
+                        >
+                          {copiedCodeIndex === idx ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" /> Proposal Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" /> Copy Proposal
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. SAAS / PRODUCT TEAM VIEW */}
+                  {audienceMode === "SAAS_TEAM" && (
+                    <div className="space-y-4">
+                      <div className="text-xs text-foreground/90 leading-relaxed bg-amber-500/5 p-4 rounded-lg border border-amber-500/20 space-y-2">
+                        <div className="font-semibold text-[11px] text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5" />
+                          Product Experience & Activation Bottleneck
+                        </div>
+                        <p className="text-sm font-medium text-foreground">
+                          {rec?.explanationSaaSTeam || "Product friction point impacting new user onboarding latency."}
+                        </p>
+                      </div>
+
+                      {/* Metric Target Attribution */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div className="p-3 rounded-lg border border-border bg-card space-y-0.5">
+                          <span className="text-muted-foreground text-[10px] uppercase font-semibold">Affected Metric</span>
+                          <div className="font-bold text-foreground">LCP &amp; Interaction Speed</div>
+                        </div>
+
+                        <div className="p-3 rounded-lg border border-border bg-card space-y-0.5">
+                          <span className="text-muted-foreground text-[10px] uppercase font-semibold">Savings Target</span>
+                          <div className="font-bold text-emerald-500">~{issue.displayValue || "500ms"}</div>
+                        </div>
+
+                        <div className="p-3 rounded-lg border border-border bg-card space-y-0.5">
+                          <span className="text-muted-foreground text-[10px] uppercase font-semibold">CI Regression Risk</span>
+                          <div className="font-bold text-foreground">High on Mobile Deployments</div>
+                        </div>
+                      </div>
+
+                      {/* Sprint Acceptance & Regression Verification */}
+                      {Array.isArray(rec?.verificationSteps) && rec.verificationSteps.length > 0 && (
+                        <div className="p-3.5 rounded-lg border border-border bg-secondary/20 text-xs space-y-1.5">
+                          <div className="font-semibold text-[11px] text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                            CI/CD Guardrails &amp; Release Verification Criteria
+                          </div>
+                          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                            {rec.verificationSteps.map((s: string, i: number) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* 1-Click Jira / Linear Ticket Export */}
+                      <div className="p-4 rounded-lg border border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <div className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-amber-500" />
+                            Agile Sprint Ticket (Jira / Linear)
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Copy a formatted user story with problem statement and acceptance criteria ready for sprint backlog.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyJiraTicket(issue, rec, idx)}
+                          className="px-3.5 py-1.5 rounded-md bg-secondary hover:bg-secondary/80 border border-border text-foreground text-xs font-semibold transition flex items-center gap-1.5 shrink-0"
+                        >
+                          {copiedCodeIndex === idx ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" /> Ticket Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" /> Copy Jira / Linear Ticket
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Offending Assets / Evidence (Shared across personas) */}
                   {Array.isArray(issue.evidenceDetails) && issue.evidenceDetails.length > 0 && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 pt-1">
                       <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        Audit Evidence ({issue.evidenceDetails.length} offending item(s))
+                        Diagnostic Evidence ({issue.evidenceDetails.length} item(s))
                       </div>
                       <div className="space-y-1">
                         {issue.evidenceDetails.slice(0, 3).map((item: any, i: number) => (
                           <div
                             key={i}
-                            className="p-2 rounded bg-secondary/40 border border-border font-mono text-[11px] flex items-center justify-between truncate"
+                            className="p-2 rounded bg-secondary/30 border border-border font-mono text-[11px] flex items-center justify-between truncate"
                           >
-                            <span className="truncate max-w-lg">{item.url || item.description || "Asset"}</span>
+                            <span className="truncate max-w-lg">{item.url || item.description || "Resource"}</span>
                             <div className="flex items-center gap-3 shrink-0 text-muted-foreground">
                               {item.wastedMs != null && (
                                 <span className="text-amber-500 font-semibold">{item.wastedMs}ms wasted</span>
@@ -937,59 +1721,6 @@ export default function ExecutionDeepDivePage() {
                             </div>
                           </div>
                         ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Code Snippet (When Developer or SaaS Mode) */}
-                  {rec?.remediationCodeSnippet && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        <span>Remediation Code Example</span>
-                        <button
-                          onClick={() => copySnippet(rec.remediationCodeSnippet, idx)}
-                          className="flex items-center gap-1 text-primary hover:underline font-mono text-xs"
-                        >
-                          {copiedCodeIndex === idx ? (
-                            <>
-                              <Check className="w-3.5 h-3.5" /> Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5" /> Copy Code
-                            </>
-                          )}
-                        </button>
-                      </div>
-                      <pre className="p-4 rounded-md bg-zinc-950 text-zinc-100 font-mono text-xs overflow-x-auto border border-zinc-800">
-                        <code>{rec.remediationCodeSnippet}</code>
-                      </pre>
-                    </div>
-                  )}
-
-                  {/* Implementation & Verification Steps */}
-                  {rec && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
-                      <div className="p-3 rounded border border-border bg-card space-y-1.5">
-                        <div className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
-                          Implementation Checklist
-                        </div>
-                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                          {rec.implementationSteps?.map((s: string, i: number) => (
-                            <li key={i}>{s}</li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div className="p-3 rounded border border-border bg-card space-y-1.5">
-                        <div className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
-                          Verification Steps
-                        </div>
-                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                          {rec.verificationSteps?.map((v: string, i: number) => (
-                            <li key={i}>{v}</li>
-                          ))}
-                        </ul>
                       </div>
                     </div>
                   )}
@@ -1076,6 +1807,18 @@ export default function ExecutionDeepDivePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* AI Deep Search Modal */}
+      {activeDeepSearchIssue && (
+        <DeepSearchModal
+          isOpen={!!activeDeepSearchIssue}
+          onClose={() => setActiveDeepSearchIssue(null)}
+          targetUrl={execution.url}
+          techStack={execution.seo?.detectedTechStack || activeDeepSearchIssue.recommendations?.[0]?.detectedStack || "NEXTJS"}
+          issue={activeDeepSearchIssue}
+          initialPersona={audienceMode}
+        />
       )}
 
       {/* Floating Action Toast Notification */}

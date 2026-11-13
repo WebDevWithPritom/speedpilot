@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@speedpilot/database";
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "speedpilot-super-secure-production-jwt-token-secret-2026"
+  process.env.AUTH_SECRET || process.env.SESSION_SECRET || "speedpilot-dev-secret-change-in-production"
 );
 
 export const AUTH_COOKIE_NAME = "sp_auth_token";
@@ -73,14 +73,21 @@ export async function comparePassword(plain: string, hash: string): Promise<bool
  * Ensures user has an active workspace and returns full session info.
  */
 export async function getOrCreateUserWorkspace(user: { id: string; email: string; name?: string | null }) {
-  // Check if user already has an owned or member workspace
+  // Check if user already has an owned or member workspace with minimal field projection
   const membership = await prisma.workspaceMember.findFirst({
     where: { userId: user.id },
-    include: {
+    select: {
+      role: true,
       workspace: {
-        include: {
+        select: {
+          id: true,
+          name: true,
           subscription: {
-            include: { plan: true },
+            select: {
+              plan: {
+                select: { code: true },
+              },
+            },
           },
         },
       },

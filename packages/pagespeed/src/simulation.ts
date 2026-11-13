@@ -29,16 +29,18 @@ interface DiagnosticTemplate {
   generateEvidence: (domain: string, wastedMs: number, wastedKb: number) => NormalizedAuditIssue["evidenceItems"];
 }
 
+const simEvidenceNote = (domain: string, assetType: string) =>
+  `${domain} [Simulated ${assetType} — live Google PSI unavailable]`;
+
 const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
   {
     code: "render-blocking-resources",
     title: "Eliminate render-blocking resources",
     category: "PERFORMANCE",
     severity: "HIGH",
-    formatDisplay: (ms) => `Potential savings of ${ms} ms`,
+    formatDisplay: (ms) => `Potential savings of ${ms} ms (Simulated)`,
     generateEvidence: (domain, ms, kb) => [
-      { url: `${domain}/assets/css/theme-bundle.min.css`, wastedMs: Math.round(ms * 0.65), wastedBytes: Math.round(kb * 0.45 * 1024) },
-      { url: `${domain}/assets/js/head-tracking.js`, wastedMs: Math.round(ms * 0.35), wastedBytes: Math.round(kb * 0.55 * 1024) },
+      { url: simEvidenceNote(domain, "CSS/JS bundle"), wastedMs: Math.round(ms * 0.65), wastedBytes: Math.round(kb * 0.45 * 1024) },
     ],
   },
   {
@@ -46,10 +48,9 @@ const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
     title: "Reduce unused JavaScript",
     category: "PERFORMANCE",
     severity: "HIGH",
-    formatDisplay: (_, kb) => `Potential savings of ${kb} KB`,
+    formatDisplay: (_, kb) => `Potential savings of ${kb} KB (Simulated)`,
     generateEvidence: (domain, _, kb) => [
-      { url: `${domain}/chunks/vendors-node_modules.chunk.js`, wastedBytes: Math.round(kb * 0.7 * 1024) },
-      { url: `${domain}/static/main-app.js`, wastedBytes: Math.round(kb * 0.3 * 1024) },
+      { url: simEvidenceNote(domain, "JS bundle"), wastedBytes: Math.round(kb * 1024) },
     ],
   },
   {
@@ -57,10 +58,9 @@ const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
     title: "Serve images in next-gen formats (WebP or AVIF)",
     category: "PERFORMANCE",
     severity: "MEDIUM",
-    formatDisplay: (_, kb) => `Potential savings of ${kb} KB`,
+    formatDisplay: (_, kb) => `Potential savings of ${kb} KB (Simulated)`,
     generateEvidence: (domain, _, kb) => [
-      { url: `${domain}/images/hero-header.jpg`, wastedBytes: Math.round(kb * 0.6 * 1024) },
-      { url: `${domain}/images/feature-graphic.png`, wastedBytes: Math.round(kb * 0.4 * 1024) },
+      { url: simEvidenceNote(domain, "Image asset"), wastedBytes: Math.round(kb * 1024) },
     ],
   },
   {
@@ -68,10 +68,9 @@ const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
     title: "Defer offscreen images",
     category: "PERFORMANCE",
     severity: "MEDIUM",
-    formatDisplay: (_, kb) => `Potential savings of ${kb} KB`,
+    formatDisplay: (_, kb) => `Potential savings of ${kb} KB (Simulated)`,
     generateEvidence: (domain, _, kb) => [
-      { url: `${domain}/uploads/author-portrait.jpg`, wastedBytes: Math.round(kb * 0.5 * 1024) },
-      { url: `${domain}/uploads/card-thumbnail-2.jpg`, wastedBytes: Math.round(kb * 0.5 * 1024) },
+      { url: simEvidenceNote(domain, "Offscreen image"), wastedBytes: Math.round(kb * 1024) },
     ],
   },
   {
@@ -79,10 +78,9 @@ const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
     title: "Enable text compression (gzip, deflate or Brotli)",
     category: "PERFORMANCE",
     severity: "HIGH",
-    formatDisplay: (_, kb) => `Potential savings of ${kb} KB`,
+    formatDisplay: (_, kb) => `Potential savings of ${kb} KB (Simulated)`,
     generateEvidence: (domain, _, kb) => [
-      { url: `${domain}/api/content/manifest.json`, wastedBytes: Math.round(kb * 0.65 * 1024) },
-      { url: `${domain}/assets/icons/feather-icons.svg`, wastedBytes: Math.round(kb * 0.35 * 1024) },
+      { url: simEvidenceNote(domain, "Text response"), wastedBytes: Math.round(kb * 1024) },
     ],
   },
   {
@@ -90,9 +88,9 @@ const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
     title: "Avoid enormous network payloads",
     category: "PERFORMANCE",
     severity: "MEDIUM",
-    formatDisplay: (_, kb) => `Total payload was ${(kb / 1024 + 1.2).toFixed(1)} MB`,
+    formatDisplay: (_, kb) => `Total payload was ${(kb / 1024 + 1.2).toFixed(1)} MB (Simulated)`,
     generateEvidence: (domain, _, kb) => [
-      { url: `${domain}/static/media/background-video-preview.mp4`, wastedBytes: Math.round((kb + 800) * 1024) },
+      { url: simEvidenceNote(domain, "Media payload"), wastedBytes: Math.round((kb + 800) * 1024) },
     ],
   },
   {
@@ -100,10 +98,9 @@ const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
     title: "Ensure text remains visible during webfont load",
     category: "PERFORMANCE",
     severity: "LOW",
-    formatDisplay: (ms) => `Savings of ${Math.round(ms * 0.4)} ms`,
+    formatDisplay: (ms) => `Savings of ${Math.round(ms * 0.4)} ms (Simulated)`,
     generateEvidence: (domain) => [
-      { url: `${domain}/fonts/inter-latin-ext.woff2`, wastedMs: 140 },
-      { url: `${domain}/fonts/inter-display.woff2`, wastedMs: 95 },
+      { url: simEvidenceNote(domain, "Webfont"), wastedMs: 140 },
     ],
   },
   {
@@ -111,9 +108,9 @@ const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
     title: "Properly size images",
     category: "PERFORMANCE",
     severity: "MEDIUM",
-    formatDisplay: (_, kb) => `Potential savings of ${kb} KB`,
+    formatDisplay: (_, kb) => `Potential savings of ${kb} KB (Simulated)`,
     generateEvidence: (domain, _, kb) => [
-      { url: `${domain}/media/showcase-desktop-1920x1080.jpg`, wastedBytes: Math.round(kb * 1024) },
+      { url: simEvidenceNote(domain, "Responsive image"), wastedBytes: Math.round(kb * 1024) },
     ],
   },
   {
@@ -121,7 +118,7 @@ const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
     title: "Reduce initial server response time (TTFB)",
     category: "PERFORMANCE",
     severity: "HIGH",
-    formatDisplay: (ms) => `Root document took ${ms + 420} ms to respond`,
+    formatDisplay: (ms) => `Root document took ${ms + 420} ms to respond (Simulated)`,
     generateEvidence: (domain, ms) => [
       { url: domain, wastedMs: ms + 420 },
     ],
@@ -131,9 +128,9 @@ const DIAGNOSTIC_LIBRARY: DiagnosticTemplate[] = [
     title: "Minify JavaScript",
     category: "PERFORMANCE",
     severity: "LOW",
-    formatDisplay: (_, kb) => `Potential savings of ${Math.round(kb * 0.4)} KB`,
+    formatDisplay: (_, kb) => `Potential savings of ${Math.round(kb * 0.4)} KB (Simulated)`,
     generateEvidence: (domain, _, kb) => [
-      { url: `${domain}/scripts/custom-analytics.js`, wastedBytes: Math.round(kb * 0.4 * 1024) },
+      { url: simEvidenceNote(domain, "Unminified script"), wastedBytes: Math.round(kb * 0.4 * 1024) },
     ],
   },
 ];

@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PROVIDER_DEFAULTS, inferProviderFromKey, isAllowedProviderBaseUrl } from "@speedpilot/ai-engine";
 
 export const revalidate = 0;
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { type, apiKey, provider, model } = body;
+    const { type, apiKey, provider, model, baseUrl } = body;
 
-    const keyToTest = (apiKey || "").trim() || (type === "GOOGLE_PSI" ? process.env.GOOGLE_PAGESPEED_API_KEY : process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY);
+    const isKeylessAllowed = provider === "OLLAMA";
+    const keyToTest =
+      (apiKey || "").trim() ||
+      (type === "GOOGLE_PSI"
+        ? process.env.GOOGLE_PAGESPEED_API_KEY
+        : process.env.GROQ_API_KEY ||
+          process.env.CEREBRAS_API_KEY ||
+          process.env.OPENROUTER_API_KEY ||
+          process.env.SAMBANOVA_API_KEY ||
+          process.env.GITHUB_MODELS_TOKEN ||
+          process.env.GITHUB_TOKEN ||
+          process.env.NVIDIA_API_KEY ||
+          process.env.MISTRAL_API_KEY ||
+          process.env.GEMINI_API_KEY ||
+          process.env.DEEPSEEK_API_KEY ||
+          process.env.OPENAI_API_KEY);
 
-    if (!keyToTest) {
+    if (!keyToTest && !isKeylessAllowed) {
       return NextResponse.json({ success: false, error: "No API key provided to test" }, { status: 400 });
     }
 
@@ -53,7 +69,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === "AI_PROVIDER") {
-      const activeProvider = provider || (keyToTest.startsWith("AIzaSy") ? "GEMINI" : "OPENAI");
+      const activeProvider = provider || (keyToTest ? inferProviderFromKey(keyToTest) : null) || "OPENAI";
       const start = Date.now();
 
       if (activeProvider === "GEMINI") {
@@ -95,45 +111,72 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (activeProvider === "OPENAI") {
-        const openAiModel = model || "gpt-4o-mini";
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12_000);
+      // All OpenAI-compatible providers share PROVIDER_DEFAULTS
+      const defaults = PROVIDER_DEFAULTS[activeProvider] ?? { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" };
+      const endpoint = baseUrl || (activeProvider === "OLLAMA" ? process.env.OLLAMA_BASE_URL : undefined) || defaults.baseUrl;
+      if (baseUrl && !isAllowedProviderBaseUrl(endpoint, activeProvider)) {
+        return NextResponse.json({ success: false, error: "Blocked unsafe or private custom AI base URL (SSRF protection)." }, { status: 400 });
+      }
+      const defaultModel = defaults.model;
 
-        try {
-          const res = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${keyToTest}`,
-            },
-            body: JSON.stringify({
-              model: openAiModel,
-              messages: [{ role: "user", content: "ping" }],
-              max_tokens: 5,
-            }),
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
+      const activeModel = model || defaultModel;
+      const targetUrl = `${endpoint.replace(/\/+$/, "")}/chat/completions`;
 
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (keyToTest) {
+        headers["Authorization"] = `Bearer ${keyToTest}`;
+      }
+
+      const controller = new AbortController();
+      const timeoutMs = activeProvider === "OLLAMA" || activeProvider === "CUSTOM" ? 60_000 : 15_000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const res = await fetch(targetUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: activeModel,
+            messages: [{ role: "user", content: "ping" }],
+            max_tokens: 5,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData?.error?.message || errData?.message || `HTTP ${res.status} from ${activeProvider} endpoint`;
+          
+          if (activeProvider === "OLLAMA" && res.status === 404) {
             return NextResponse.json({
               success: false,
-              error: errData?.error?.message || `HTTP ${res.status} from OpenAI`,
+              error: `Ollama is running, but model '${activeModel}' is not found. Run 'ollama pull ${activeModel}' in your terminal to download it.`,
             });
           }
 
           return NextResponse.json({
-            success: true,
-            message: `OpenAI API key verified with model ${openAiModel}!`,
-            latencyMs: Date.now() - start,
-            provider: "OPENAI",
+            success: false,
+            error: errMsg,
           });
-        } catch (fetchErr: any) {
-          clearTimeout(timeoutId);
-          return NextResponse.json({ success: false, error: fetchErr.message });
         }
+
+        return NextResponse.json({
+          success: true,
+          message: `${activeProvider} connected successfully with model ${activeModel}!`,
+          latencyMs: Date.now() - start,
+          provider: activeProvider,
+          model: activeModel,
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        let errorMsg = fetchErr.message;
+        if (activeProvider === "OLLAMA" && (fetchErr.cause?.code === "ECONNREFUSED" || fetchErr.message.includes("fetch failed"))) {
+          errorMsg = `Could not connect to Ollama at ${endpoint}. Please ensure Ollama is installed and running ('ollama serve').`;
+        }
+        return NextResponse.json({ success: false, error: errorMsg });
       }
     }
 

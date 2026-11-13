@@ -53,6 +53,18 @@ export async function POST(req: NextRequest) {
 
     const wsInfo = await getOrCreateUserWorkspace(user);
 
+    await prisma.activityLog
+      .create({
+        data: {
+          userId: user.id,
+          action: "USER_SIGNUP",
+          entityType: "User",
+          entityId: user.id,
+          metadata: { workspaceId: wsInfo.workspaceId },
+        },
+      })
+      .catch(() => {});
+
     const token = await signAuthToken({
       userId: user.id,
       email: user.email,
