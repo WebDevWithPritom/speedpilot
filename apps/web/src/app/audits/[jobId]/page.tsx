@@ -267,66 +267,71 @@ export default function BulkAuditJobResultsPage() {
       {/* Results Table */}
       <div className="border border-border rounded-lg overflow-hidden bg-card shadow-sm">
         {/* Metric Explanation Legend for Marketers & Developers */}
-        <div className="px-4 py-2.5 bg-secondary/30 border-b border-border flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
+        <div className="px-4 py-2 bg-secondary/20 border-b border-border flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-foreground">Score Legend:</span>
-            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> 90–100 Good</span>
-            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500"></span> 50–89 Needs Work</span>
-            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500"></span> 0–49 Poor</span>
+            <span className="font-semibold text-foreground">Score Ranges:</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> 90–100 (Good)</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500"></span> 50–89 (Needs Work)</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500"></span> 0–49 (Poor)</span>
           </div>
-          <div className="text-[11px] italic">
-            * Lab scores are simulated synthetic tests; Field metrics (CrUX) reflect genuine real-user experience over 28 days.
+          <div className="text-[11px] text-muted-foreground/80">
+            Hover column titles for full metric definitions & CWV thresholds
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-secondary/40 text-muted-foreground border-b border-border font-medium">
-              <tr>
-                <th className="py-3 px-4 w-8"></th>
-                <th className="py-3 px-4">
-                  <div className="font-semibold text-foreground">Target URL</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Page Destination</div>
+              {/* Category Super-Headers */}
+              <tr className="border-b border-border/60 text-[10px] uppercase tracking-wider font-semibold">
+                <th colSpan={3} className="py-1.5 px-4 text-foreground/80 bg-secondary/30">
+                  Target Page & Device
                 </th>
-                <th className="py-3 px-3 text-center">
-                  <div className="font-semibold text-foreground">Device</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Strategy</div>
+                <th colSpan={4} className="py-1.5 px-3 text-center text-foreground/80 bg-secondary/50 border-x border-border/60">
+                  Lighthouse Scores (0–100)
                 </th>
-                <th className="py-3 px-3 text-center" title="Lighthouse Performance Score (0-100) — Synthetic benchmark of overall loading speed and page rendering.">
-                  <div className="font-semibold text-foreground">Performance</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Page Speed</div>
+                <th colSpan={3} className="py-1.5 px-3 text-center text-foreground/80 bg-secondary/30 border-r border-border/60">
+                  Core Web Vitals
                 </th>
-                <th className="py-3 px-3 text-center" title="Accessibility Score (0-100) — Usability for screen readers, color contrast, keyboard navigation, and ARIA semantics.">
-                  <div className="font-semibold text-foreground">Accessibility</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">UX & Contrast</div>
+                <th colSpan={2} className="py-1.5 px-4 text-center text-foreground/80 bg-secondary/50">
+                  Audit State
                 </th>
-                <th className="py-3 px-3 text-center" title="Best Practices Score (0-100) — Modern web standards, HTTPS security, modern image formats, and clean console logging.">
-                  <div className="font-semibold text-foreground">Best Practices</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Code Hygiene</div>
+              </tr>
+              {/* Individual Column Headers (Single Line, No Awkward Wrapping) */}
+              <tr className="text-xs">
+                <th className="py-2.5 px-3 w-8"></th>
+                <th className="py-2.5 px-3 whitespace-nowrap font-semibold text-foreground">
+                  Page URL
                 </th>
-                <th className="py-3 px-3 text-center" title="SEO Health Score (0-100) — Search engine readiness: title tags, meta descriptions, canonical URLs, and indexability.">
-                  <div className="font-semibold text-foreground">SEO Health</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Rankability</div>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap font-semibold text-foreground" title="Emulated audit strategy">
+                  Device
                 </th>
-                <th className="py-3 px-3 text-right" title="Largest Contentful Paint (Lab) — Time taken for the main visual content of the page to fully load. Ideal: ≤ 2.5s.">
-                  <div className="font-semibold text-foreground">LCP (Load)</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Main Content</div>
+                <th className="py-2.5 px-2.5 text-center whitespace-nowrap font-semibold text-foreground border-l border-border/40" title="Overall loading speed and rendering performance score (0-100)">
+                  Performance
                 </th>
-                <th className="py-3 px-3 text-right" title="Cumulative Layout Shift — Visual stability measuring unexpected layout jumps during page load. Ideal: ≤ 0.1.">
-                  <div className="font-semibold text-foreground">CLS (Shift)</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Visual Stability</div>
+                <th className="py-2.5 px-2.5 text-center whitespace-nowrap font-semibold text-foreground" title="Screen reader usability, color contrast, and ARIA attributes (0-100)">
+                  Accessibility
                 </th>
-                <th className="py-3 px-3 text-center" title="Interaction to Next Paint (CrUX Field) — Real Chrome user interaction latency (click/tap response delay). Ideal: ≤ 200ms.">
-                  <div className="font-semibold text-foreground">INP (Response)</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Real User Field</div>
+                <th className="py-2.5 px-2.5 text-center whitespace-nowrap font-semibold text-foreground" title="HTTPS security, modern web standards, and console hygiene (0-100)">
+                  Best Practices
                 </th>
-                <th className="py-3 px-4 text-center">
-                  <div className="font-semibold text-foreground">Status</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Execution</div>
+                <th className="py-2.5 px-2.5 text-center whitespace-nowrap font-semibold text-foreground border-r border-border/40" title="Technical SEO indexability, meta tags, and structured data (0-100)">
+                  SEO Health
                 </th>
-                <th className="py-3 px-4 text-right">
-                  <div className="font-semibold text-foreground">Actions</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">AI Fixes</div>
+                <th className="py-2.5 px-3 text-right whitespace-nowrap font-semibold text-foreground" title="Largest Contentful Paint: Time until main visual content renders. Good: ≤ 2.5s">
+                  LCP (Load)
+                </th>
+                <th className="py-2.5 px-3 text-right whitespace-nowrap font-semibold text-foreground" title="Cumulative Layout Shift: Unexpected visual layout jumps. Good: ≤ 0.1">
+                  CLS (Shift)
+                </th>
+                <th className="py-2.5 px-3 text-center whitespace-nowrap font-semibold text-foreground border-r border-border/40" title="Interaction to Next Paint: Real Chrome user click/tap latency. Good: ≤ 200ms">
+                  INP (Field)
+                </th>
+                <th className="py-2.5 px-3 text-center whitespace-nowrap font-semibold text-foreground">
+                  Status
+                </th>
+                <th className="py-2.5 px-4 text-right whitespace-nowrap font-semibold text-foreground">
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -346,7 +351,7 @@ export default function BulkAuditJobResultsPage() {
                   return (
                     <React.Fragment key={ex.id}>
                       <tr className="hover:bg-secondary/20 transition-colors">
-                        <td className="py-3 px-4">
+                        <td className="py-2.5 px-3">
                           <button
                             onClick={() => toggleRow(ex.id)}
                             className="p-1 text-muted-foreground hover:text-foreground"
@@ -356,7 +361,7 @@ export default function BulkAuditJobResultsPage() {
                         </td>
 
                         {/* URL with external icon */}
-                        <td className="py-3 px-4 font-mono">
+                        <td className="py-2.5 px-3 font-mono">
                           <div className="flex items-center gap-1.5 max-w-sm truncate" title={ex.url}>
                             <span className="truncate">{ex.url}</span>
                             <a
@@ -371,7 +376,7 @@ export default function BulkAuditJobResultsPage() {
                         </td>
 
                         {/* Device Badge */}
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-2.5 px-2 text-center">
                           {ex.device === "MOBILE" ? (
                             <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="Mobile">
                               <Smartphone className="w-3.5 h-3.5" />
@@ -384,29 +389,29 @@ export default function BulkAuditJobResultsPage() {
                         </td>
 
                         {/* Scores */}
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-2.5 px-2.5 text-center border-l border-border/40">
                           <MetricBadge score={lh?.performanceScore} size="sm" />
                         </td>
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-2.5 px-2.5 text-center">
                           <MetricBadge score={lh?.accessibilityScore} size="sm" />
                         </td>
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-2.5 px-2.5 text-center">
                           <MetricBadge score={lh?.bestPracticesScore} size="sm" />
                         </td>
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-2.5 px-2.5 text-center border-r border-border/40">
                           <MetricBadge score={lh?.seoScore} size="sm" />
                         </td>
 
                         {/* Lab Metrics */}
-                        <td className="py-3 px-3 text-right font-mono font-medium">
+                        <td className="py-2.5 px-3 text-right font-mono font-medium">
                           {formatMs(lh?.lcpMs)}
                         </td>
-                        <td className="py-3 px-3 text-right font-mono font-medium">
+                        <td className="py-2.5 px-3 text-right font-mono font-medium">
                           {lh?.cls != null ? lh.cls.toFixed(3) : "—"}
                         </td>
 
                         {/* INP Field Data */}
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-2.5 px-3 text-center border-r border-border/40">
                           {crux?.inpValueMs != null ? (
                             <span className="font-mono text-xs">{crux.inpValueMs}ms</span>
                           ) : (
@@ -417,12 +422,12 @@ export default function BulkAuditJobResultsPage() {
                         </td>
 
                         {/* Execution Status */}
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-3 text-center">
                           <StatusBadge status={ex.status} />
                         </td>
 
                         {/* Action Link */}
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-2.5 px-4 text-right">
                           <Link
                             href={`/audits/executions/${ex.id}`}
                             className="px-2.5 py-1 rounded bg-secondary hover:bg-secondary/80 text-[11px] font-semibold transition"
