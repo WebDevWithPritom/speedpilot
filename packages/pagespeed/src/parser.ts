@@ -156,3 +156,4 @@ export function parseGooglePSIResponse(raw: any, targetUrl: string, device: Sing
     rawExecutionTimeMs: Math.round(lhr.timing?.total ?? 0),
   };
 }
+

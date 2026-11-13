@@ -72,3 +72,4 @@ describe("Technology Framework Detection", () => {
     expect(res.detectedStack).toBe("UNKNOWN");
   });
 });
+

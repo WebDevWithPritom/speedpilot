@@ -109,3 +109,4 @@ describe("PageSpeed Response Parser", () => {
     expect(issue?.evidenceItems[0]?.wastedMs).toBe(420);
   });
 });
+

@@ -1,115 +1,10 @@
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
-}
-
-enum WorkspaceRole {
-  OWNER
-  ADMIN
-  MEMBER
-  VIEWER
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  PAST_DUE
-  CANCELED
-  TRIALING
-}
-
-enum TechStack {
-  WORDPRESS
-  WOOCOMMERCE
-  SHOPIFY
-  NEXTJS
-  REACT
-  LARAVEL
-  CUSTOM
-  UNKNOWN
-}
-
-enum DeviceMode {
-  MOBILE
-  DESKTOP
-  BOTH
-}
-
-enum AuditDevice {
-  MOBILE
-  DESKTOP
-}
-
-enum AuditJobSource {
-  MANUAL_SINGLE
-  TEXTAREA_BULK
-  CSV_IMPORT
-  SITEMAP_IMPORT
-  SCHEDULED_CRON
-  API_TRIGGER
-}
-
-enum AuditJobStatus {
-  PENDING
-  QUEUED
-  PROCESSING
-  COMPLETED
-  PARTIAL_FAILURE
-  FAILED
-  CANCELLED
-}
-
-enum AuditExecutionStatus {
-  QUEUED
-  FETCHING
-  AUDITING
-  ANALYZING_AI
-  COMPLETED
-  FAILED
-  CANCELLED
-}
-
-enum MetricCategory {
-  GOOD
-  NEEDS_IMPROVEMENT
-  POOR
-}
-
-enum IssueSeverity {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum IssueCategory {
-  PERFORMANCE
-  ACCESSIBILITY
-  BEST_PRACTICES
-  SEO
-  TECHNICAL_SEO
-}
-
-enum Difficulty {
-  EASY
-  MEDIUM
-  HARD
-}
-
-enum Impact {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-enum ScheduleFrequency {
-  DAILY
-  WEEKLY
-  MONTHLY
-  CUSTOM_CRON
 }
 
 // ==========================================
@@ -149,7 +44,7 @@ model WorkspaceMember {
   id          String        @id @default(uuid())
   workspaceId String
   userId      String
-  role        WorkspaceRole @default(MEMBER)
+  role        String        @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime      @default(now())
@@ -177,7 +72,7 @@ model Subscription {
   id                   String             @id @default(uuid())
   workspaceId          String             @unique
   planId               String
-  status               SubscriptionStatus @default(ACTIVE)
+  status               String             @default("ACTIVE") // ACTIVE, PAST_DUE, CANCELED
   currentPeriodStart   DateTime
   currentPeriodEnd     DateTime
   stripeCustomerId     String?
@@ -209,7 +104,7 @@ model Project {
   name          String
   description   String?
   primaryDomain String
-  techStack     TechStack    @default(UNKNOWN)
+  techStack     String       @default("UNKNOWN") // WORDPRESS, WOOCOMMERCE, SHOPIFY, NEXTJS, REACT, LARAVEL, CUSTOM, UNKNOWN
   workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   domains       Domain[]
   urls          ProjectURL[]
@@ -257,9 +152,9 @@ model AuditJob {
   id            String           @id @default(uuid())
   projectId     String
   workspaceId   String
-  source        AuditJobSource   @default(MANUAL_SINGLE)
-  deviceMode    DeviceMode       @default(BOTH)
-  status        AuditJobStatus   @default(PENDING)
+  source        String           @default("MANUAL_SINGLE") // MANUAL_SINGLE, TEXTAREA_BULK, CSV_IMPORT, SITEMAP_IMPORT, SCHEDULED_CRON, API_TRIGGER
+  deviceMode    String           @default("BOTH") // MOBILE, DESKTOP, BOTH
+  status        String           @default("PENDING") // PENDING, QUEUED, PROCESSING, COMPLETED, PARTIAL_FAILURE, FAILED, CANCELLED
   totalUrls     Int              @default(0)
   completedUrls Int              @default(0)
   failedUrls    Int              @default(0)
@@ -280,8 +175,8 @@ model AuditExecution {
   auditJobId      String
   projectUrlId    String
   url             String
-  device          AuditDevice
-  status          AuditExecutionStatus @default(QUEUED)
+  device          String               // MOBILE, DESKTOP
+  status          String               @default("QUEUED") // QUEUED, FETCHING, AUDITING, ANALYZING_AI, COMPLETED, FAILED, CANCELLED
   retryCount      Int                  @default(0)
   errorMessage    String?
   executionTimeMs Int?
@@ -324,11 +219,11 @@ model CrUXResult {
   auditExecutionId String          @unique
   scope            String          // "URL", "ORIGIN", "UNAVAILABLE"
   lcpValueMs       Float?
-  lcpCategory      MetricCategory?
+  lcpCategory      String?         // GOOD, NEEDS_IMPROVEMENT, POOR
   inpValueMs       Float?
-  inpCategory      MetricCategory?
+  inpCategory      String?         // GOOD, NEEDS_IMPROVEMENT, POOR
   clsValue         Float?
-  clsCategory      MetricCategory?
+  clsCategory      String?         // GOOD, NEEDS_IMPROVEMENT, POOR
   collectionPeriod String?
   auditExecution   AuditExecution  @relation(fields: [auditExecutionId], references: [id], onDelete: Cascade)
   createdAt        DateTime        @default(now())
@@ -366,7 +261,7 @@ model IssueGroup {
   projectId       String
   code            String
   title           String
-  severity        IssueSeverity
+  severity        String             // LOW, MEDIUM, HIGH, CRITICAL
   sharedResource  String?
   affectedUrlCount Int               @default(1)
   project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -384,8 +279,8 @@ model AuditIssue {
   issueGroupId     String?
   code             String
   title            String
-  category         IssueCategory
-  severity         IssueSeverity
+  category         String            // PERFORMANCE, ACCESSIBILITY, BEST_PRACTICES, SEO, TECHNICAL_SEO
+  severity         String            // LOW, MEDIUM, HIGH, CRITICAL
   displayValue     String?
   evidenceDetails  Json?
   auditExecution   AuditExecution    @relation(fields: [auditExecutionId], references: [id], onDelete: Cascade)
@@ -401,7 +296,7 @@ model AIRecommendation {
   id                     String      @id @default(uuid())
   auditIssueId           String?
   issueGroupId           String?     @unique
-  detectedStack          TechStack   @default(UNKNOWN)
+  detectedStack          String      @default("UNKNOWN")
   explanationMarketer    String
   explanationDeveloper   String
   explanationAgency      String
@@ -409,8 +304,8 @@ model AIRecommendation {
   remediationCodeSnippet String?
   implementationSteps    Json
   verificationSteps      Json
-  estimatedDifficulty    Difficulty  @default(MEDIUM)
-  estimatedImpact        Impact      @default(HIGH)
+  estimatedDifficulty    String      @default("MEDIUM")
+  estimatedImpact        String      @default("HIGH")
   promptTokens           Int         @default(0)
   completionTokens       Int         @default(0)
   signatureHash          String
@@ -429,9 +324,9 @@ model AIRecommendation {
 model Schedule {
   id             String            @id @default(uuid())
   projectId      String
-  frequency      ScheduleFrequency @default(WEEKLY)
+  frequency      String            @default("WEEKLY") // DAILY, WEEKLY, MONTHLY, CUSTOM_CRON
   cronExpression String?
-  deviceMode     DeviceMode        @default(BOTH)
+  deviceMode     String            @default("BOTH")
   isActive       Boolean           @default(true)
   lastRunAt      DateTime?
   nextRunAt      DateTime?
@@ -493,4 +388,3 @@ model ActivityLog {
 
   @@index([userId])
 }
-

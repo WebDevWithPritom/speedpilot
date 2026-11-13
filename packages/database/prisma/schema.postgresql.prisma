@@ -1,0 +1,496 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+enum TechStack {
+  WORDPRESS
+  WOOCOMMERCE
+  SHOPIFY
+  NEXTJS
+  REACT
+  LARAVEL
+  CUSTOM
+  UNKNOWN
+}
+
+enum DeviceMode {
+  MOBILE
+  DESKTOP
+  BOTH
+}
+
+enum AuditDevice {
+  MOBILE
+  DESKTOP
+}
+
+enum AuditJobSource {
+  MANUAL_SINGLE
+  TEXTAREA_BULK
+  CSV_IMPORT
+  SITEMAP_IMPORT
+  SCHEDULED_CRON
+  API_TRIGGER
+}
+
+enum AuditJobStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  COMPLETED
+  PARTIAL_FAILURE
+  FAILED
+  CANCELLED
+}
+
+enum AuditExecutionStatus {
+  QUEUED
+  FETCHING
+  AUDITING
+  ANALYZING_AI
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum MetricCategory {
+  GOOD
+  NEEDS_IMPROVEMENT
+  POOR
+}
+
+enum IssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IssueCategory {
+  PERFORMANCE
+  ACCESSIBILITY
+  BEST_PRACTICES
+  SEO
+  TECHNICAL_SEO
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Impact {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ScheduleFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM_CRON
+}
+
+// ==========================================
+// User & Multi-Tenant Workspace Hierarchy
+// ==========================================
+
+model User {
+  id           String            @id @default(uuid())
+  email        String            @unique
+  name         String?
+  passwordHash String?
+  avatarUrl    String?
+  memberships  WorkspaceMember[]
+  activityLogs ActivityLog[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model Workspace {
+  id           String            @id @default(uuid())
+  name         String
+  slug         String            @unique
+  logoUrl      String?
+  customDomain String?
+  members      WorkspaceMember[]
+  projects     Project[]
+  subscription Subscription?
+  apiKeys      APIKey[]
+  webhooks     Webhook[]
+  usageRecords UsageRecord[]
+  auditJobs    AuditJob[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Plan {
+  id                  String         @id @default(uuid())
+  name                String
+  code                String         @unique // FREE, STARTER, PRO, AGENCY
+  maxAuditsPerMonth   Int
+  maxConcurrentJobs   Int            @default(2)
+  maxUrlsPerProject   Int            @default(100)
+  hasWhiteLabel       Boolean        @default(false)
+  hasAPI              Boolean        @default(false)
+  hasScheduledAudits  Boolean        @default(false)
+  subscriptions       Subscription[]
+  createdAt           DateTime       @default(now())
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  workspaceId          String             @unique
+  planId               String
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  workspace            Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan                 Plan               @relation(fields: [planId], references: [id])
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+model UsageRecord {
+  id          String    @id @default(uuid())
+  workspaceId String
+  month       String    // e.g. "2026-11"
+  auditsRun   Int       @default(0)
+  tokensUsed  Int       @default(0)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, month])
+}
+
+// ==========================================
+// Projects & Target URLs
+// ==========================================
+
+model Project {
+  id            String       @id @default(uuid())
+  workspaceId   String
+  name          String
+  description   String?
+  primaryDomain String
+  techStack     TechStack    @default(UNKNOWN)
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  domains       Domain[]
+  urls          ProjectURL[]
+  auditJobs     AuditJob[]
+  issueGroups   IssueGroup[]
+  reports       Report[]
+  schedules     Schedule[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([workspaceId])
+}
+
+model Domain {
+  id        String   @id @default(uuid())
+  projectId String
+  hostname  String
+  isPrimary Boolean  @default(false)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, hostname])
+}
+
+model ProjectURL {
+  id             String           @id @default(uuid())
+  projectId      String
+  url            String
+  normalizedUrl  String
+  label          String?
+  isActive       Boolean          @default(true)
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  executions     AuditExecution[]
+  createdAt      DateTime         @default(now())
+
+  @@unique([projectId, normalizedUrl])
+  @@index([projectId])
+}
+
+// ==========================================
+// Audit Jobs & Executions
+// ==========================================
+
+model AuditJob {
+  id            String           @id @default(uuid())
+  projectId     String
+  workspaceId   String
+  source        AuditJobSource   @default(MANUAL_SINGLE)
+  deviceMode    DeviceMode       @default(BOTH)
+  status        AuditJobStatus   @default(PENDING)
+  totalUrls     Int              @default(0)
+  completedUrls Int              @default(0)
+  failedUrls    Int              @default(0)
+  errorMessage  String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  executions    AuditExecution[]
+  createdAt     DateTime         @default(now())
+
+  @@index([projectId])
+  @@index([workspaceId])
+}
+
+model AuditExecution {
+  id              String               @id @default(uuid())
+  auditJobId      String
+  projectUrlId    String
+  url             String
+  device          AuditDevice
+  status          AuditExecutionStatus @default(QUEUED)
+  retryCount      Int                  @default(0)
+  errorMessage    String?
+  executionTimeMs Int?
+  auditJob        AuditJob             @relation(fields: [auditJobId], references: [id], onDelete: Cascade)
+  projectUrl      ProjectURL           @relation(fields: [projectUrlId], references: [id], onDelete: Cascade)
+  lighthouse      LighthouseResult?
+  crux            CrUXResult?
+  seo             SEOResult?
+  issues          AuditIssue[]
+  createdAt       DateTime             @default(now())
+  completedAt     DateTime?
+
+  @@index([auditJobId])
+  @@index([projectUrlId])
+}
+
+// ==========================================
+// Results & Telemetry
+// ==========================================
+
+model LighthouseResult {
+  id                 String         @id @default(uuid())
+  auditExecutionId   String         @unique
+  performanceScore   Float
+  accessibilityScore Float
+  bestPracticesScore Float
+  seoScore           Float
+  fcpMs              Float
+  lcpMs              Float
+  tbtMs              Float
+  cls                Float
+  speedIndexMs       Float
+  rawJsonStoragePath String?
+  auditExecution     AuditExecution @relation(fields: [auditExecutionId], references: [id], onDelete: Cascade)
+  createdAt          DateTime       @default(now())
+}
+
+model CrUXResult {
+  id               String          @id @default(uuid())
+  auditExecutionId String          @unique
+  scope            String          // "URL", "ORIGIN", "UNAVAILABLE"
+  lcpValueMs       Float?
+  lcpCategory      MetricCategory?
+  inpValueMs       Float?
+  inpCategory      MetricCategory?
+  clsValue         Float?
+  clsCategory      MetricCategory?
+  collectionPeriod String?
+  auditExecution   AuditExecution  @relation(fields: [auditExecutionId], references: [id], onDelete: Cascade)
+  createdAt        DateTime        @default(now())
+}
+
+model SEOResult {
+  id                    String         @id @default(uuid())
+  auditExecutionId      String         @unique
+  httpStatus            Int
+  isHttps               Boolean
+  pageTitle             String?
+  titleLength           Int?
+  metaDescription       String?
+  descriptionLength     Int?
+  canonicalUrl          String?
+  isCanonicalMatch      Boolean        @default(true)
+  robotsDirectives      String?
+  h1Count               Int            @default(0)
+  h1Text                String?
+  hasBrokenInternalLinks Boolean       @default(false)
+  brokenLinksCount      Int            @default(0)
+  missingAltImagesCount Int            @default(0)
+  hasOpenGraph          Boolean        @default(false)
+  hasStructuredData     Boolean        @default(false)
+  auditExecution        AuditExecution @relation(fields: [auditExecutionId], references: [id], onDelete: Cascade)
+  createdAt             DateTime       @default(now())
+}
+
+// ==========================================
+// Issues & AI Fix Recommendations
+// ==========================================
+
+model IssueGroup {
+  id              String             @id @default(uuid())
+  projectId       String
+  code            String
+  title           String
+  severity        IssueSeverity
+  sharedResource  String?
+  affectedUrlCount Int               @default(1)
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues          AuditIssue[]
+  recommendation  AIRecommendation?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([projectId])
+}
+
+model AuditIssue {
+  id               String            @id @default(uuid())
+  auditExecutionId String
+  issueGroupId     String?
+  code             String
+  title            String
+  category         IssueCategory
+  severity         IssueSeverity
+  displayValue     String?
+  evidenceDetails  Json?
+  auditExecution   AuditExecution    @relation(fields: [auditExecutionId], references: [id], onDelete: Cascade)
+  issueGroup       IssueGroup?       @relation(fields: [issueGroupId], references: [id])
+  recommendations  AIRecommendation[]
+  createdAt        DateTime          @default(now())
+
+  @@index([auditExecutionId])
+  @@index([issueGroupId])
+}
+
+model AIRecommendation {
+  id                     String      @id @default(uuid())
+  auditIssueId           String?
+  issueGroupId           String?     @unique
+  detectedStack          TechStack   @default(UNKNOWN)
+  explanationMarketer    String
+  explanationDeveloper   String
+  explanationAgency      String
+  explanationSaaSTeam    String
+  remediationCodeSnippet String?
+  implementationSteps    Json
+  verificationSteps      Json
+  estimatedDifficulty    Difficulty  @default(MEDIUM)
+  estimatedImpact        Impact      @default(HIGH)
+  promptTokens           Int         @default(0)
+  completionTokens       Int         @default(0)
+  signatureHash          String
+  auditIssue             AuditIssue? @relation(fields: [auditIssueId], references: [id], onDelete: Cascade)
+  issueGroup             IssueGroup? @relation(fields: [issueGroupId], references: [id], onDelete: Cascade)
+  createdAt              DateTime    @default(now())
+
+  @@index([auditIssueId])
+  @@index([signatureHash])
+}
+
+// ==========================================
+// Automation, Reports, Integrations & Logs
+// ==========================================
+
+model Schedule {
+  id             String            @id @default(uuid())
+  projectId      String
+  frequency      ScheduleFrequency @default(WEEKLY)
+  cronExpression String?
+  deviceMode     DeviceMode        @default(BOTH)
+  isActive       Boolean           @default(true)
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now())
+
+  @@index([projectId])
+}
+
+model Report {
+  id             String   @id @default(uuid())
+  projectId      String
+  title          String
+  format         String   // "PDF", "CSV", "XLSX"
+  fileUrl        String?
+  isWhiteLabel   Boolean  @default(false)
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@index([projectId])
+}
+
+model APIKey {
+  id          String    @id @default(uuid())
+  workspaceId String
+  name        String
+  keyPrefix   String    // e.g. "sp_live_9a8f..."
+  keyHash     String    @unique // SHA-256 hash of raw key
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId])
+}
+
+model Webhook {
+  id          String    @id @default(uuid())
+  workspaceId String
+  url         String
+  secret      String
+  events      Json      // Array of event names
+  isActive    Boolean   @default(true)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId])
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  user       User?    @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+

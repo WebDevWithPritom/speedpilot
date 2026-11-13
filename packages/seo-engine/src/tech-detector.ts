@@ -87,3 +87,4 @@ export function detectTechStack(html: string, headers: Headers = new Headers()):
     evidence: ["No definitive framework signatures found in DOM or headers."],
   };
 }
+

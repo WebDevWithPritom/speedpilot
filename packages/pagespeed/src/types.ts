@@ -20,3 +20,4 @@ export interface GooglePSIConfig {
   apiKey?: string;
   timeoutMs?: number;
 }
+

@@ -56,3 +56,4 @@ export function MetricBadge({ score, label, category, size = "md" }: MetricBadge
     </div>
   );
 }
+

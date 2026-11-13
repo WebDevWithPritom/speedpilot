@@ -59,3 +59,4 @@ describe("AI Fix Recommendation Engine", () => {
     expect(result.recommendation.remediationCodeSnippet).toContain("style_loader_tag");
   });
 });
+

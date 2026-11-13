@@ -101,3 +101,4 @@ export class PageSpeedClient {
     throw new PageSpeedAPIError(`Failed to audit '${url}' after ${maxAttempts} attempts.`);
   }
 }
+

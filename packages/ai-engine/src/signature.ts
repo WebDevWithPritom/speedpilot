@@ -14,3 +14,4 @@ export function computeIssueSignature(
   const input = `${issueCode.toLowerCase()}::${techStack}::${normalizedResource}`;
   return crypto.createHash("sha256").update(input).digest("hex");
 }
+

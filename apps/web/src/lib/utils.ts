@@ -48,3 +48,4 @@ export function getScoreColorClass(score: number | null | undefined): {
     badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20",
   };
 }
+

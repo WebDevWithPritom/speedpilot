@@ -195,12 +195,30 @@ export async function processAuditJob(job: Job<AuditJobPayload>): Promise<void> 
     });
 
     // Increment failedUrls in parent AuditJob
-    await prisma.auditJob.update({
+    const updatedJob = await prisma.auditJob.update({
       where: { id: jobId },
       data: {
         failedUrls: { increment: 1 },
       },
+      include: {
+        executions: { select: { status: true } },
+      },
     });
+
+    const allFinished = updatedJob.executions.every(
+      (e) => e.status === "COMPLETED" || e.status === "FAILED" || e.status === "CANCELLED"
+    );
+
+    if (allFinished) {
+      const anyCompleted = updatedJob.executions.some((e) => e.status === "COMPLETED");
+      await prisma.auditJob.update({
+        where: { id: jobId },
+        data: {
+          status: anyCompleted ? "PARTIAL_FAILURE" : "FAILED",
+          completedAt: new Date(),
+        },
+      });
+    }
 
     throw error;
   }

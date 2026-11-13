@@ -76,3 +76,4 @@ describe("Technical SEO Static HTML Parser", () => {
     expect(res.issues.some((i) => i.code === "page-noindex")).toBe(true);
   });
 });
+

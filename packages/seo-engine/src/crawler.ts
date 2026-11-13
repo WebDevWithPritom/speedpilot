@@ -38,3 +38,4 @@ export async function crawlAndInspectSEO(
     httpStatus: response.status,
   };
 }
+
