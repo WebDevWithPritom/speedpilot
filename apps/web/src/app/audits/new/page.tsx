@@ -106,16 +106,25 @@ export default function NewAuditPage() {
         if (!norm.isValid || !norm.normalizedUrl) {
           throw new Error(norm.error || "Please enter a valid website URL.");
         }
+        if (norm.normalizedUrl.endsWith(".xml") || norm.normalizedUrl.includes("sitemap")) {
+          throw new Error(
+            "The URL entered is an XML sitemap file. Please use the 'XML Sitemap' tab so SpeedPilot can discover and audit the actual HTML web pages within it."
+          );
+        }
         targetUrls = [norm.normalizedUrl];
       } else if (activeTab === "textarea" || activeTab === "csv") {
         const parsed = parseBulkUrlString(textareaContent);
         if (parsed.validUrls.length === 0) {
           throw new Error("No valid URLs found in the text input.");
         }
-        targetUrls = parsed.validUrls;
+        // Filter out .xml sitemaps if accidentally pasted
+        targetUrls = parsed.validUrls.filter((u) => !u.endsWith(".xml"));
+        if (targetUrls.length === 0) {
+          throw new Error("The submitted URLs appear to be XML sitemap files. Please use the 'XML Sitemap' tab.");
+        }
       } else if (activeTab === "sitemap") {
         if (sitemapDiscovered.length === 0) {
-          throw new Error("Please discover URLs from the sitemap first.");
+          throw new Error("Please click 'Discover URLs' first so SpeedPilot can extract the web pages from the sitemap.");
         }
         targetUrls = sitemapDiscovered;
       }

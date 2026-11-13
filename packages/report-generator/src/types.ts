@@ -44,3 +44,4 @@ export interface AuditReportData {
   whiteLabel?: WhiteLabelConfig;
   executions: ReportExecutionItem[];
 }
+

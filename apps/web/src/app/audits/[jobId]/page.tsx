@@ -197,6 +197,25 @@ export default function BulkAuditJobResultsPage() {
             />
           </div>
         </div>
+
+        {/* Actionable Error Guidance if Failures Occurred */}
+        {jobData.progress.failed > 0 && (
+          <div className="p-4 rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs space-y-1.5">
+            <div className="font-semibold flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              Audit Execution Encountered an External API Constraint
+            </div>
+            <p className="text-muted-foreground">
+              {filteredExecutions.find((e: any) => e.errorMessage)?.errorMessage || "An error occurred during audit execution."}
+            </p>
+            {filteredExecutions.some((e: any) => e.errorMessage?.includes("429")) && (
+              <div className="pt-2 text-[11px] text-foreground border-t border-amber-500/20">
+                <strong>Why this happens:</strong> Google limits anonymous/unauthenticated PageSpeed Insights requests per IP address.
+                To run unlimited audits without rate-limiting, obtain a free Google PageSpeed API Key from Google Cloud Console and set <code className="font-mono bg-secondary px-1 py-0.5 rounded">GOOGLE_PAGESPEED_API_KEY</code> in your <code className="font-mono bg-secondary px-1 py-0.5 rounded">.env</code> file.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -370,35 +389,51 @@ export default function BulkAuditJobResultsPage() {
                       {/* Expandable Opportunity Summary */}
                       {isExpanded && (
                         <tr className="bg-secondary/30">
-                          <td colSpan={12} className="py-3 px-8">
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="font-semibold text-foreground flex items-center gap-1.5">
-                                  <Sparkles className="w-3.5 h-3.5 text-primary" />
-                                  Diagnostic Opportunities & AI Suggestions
-                                </span>
-                                <Link
-                                  href={`/audits/executions/${ex.id}`}
-                                  className="text-primary hover:underline text-[11px] font-medium"
-                                >
-                                  View Full Analysis & AI Code Diffs →
-                                </Link>
+                          <td colSpan={12} className="py-4 px-8">
+                            {ex.status === "FAILED" ? (
+                              <div className="p-3.5 rounded-md border border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs space-y-1.5">
+                                <div className="font-semibold flex items-center gap-1.5">
+                                  <AlertCircle className="w-4 h-4 shrink-0" />
+                                  Execution Error: {ex.errorMessage || "Audit failed during execution"}
+                                </div>
+                                <p className="text-muted-foreground text-[11px]">
+                                  {ex.errorMessage?.includes("429")
+                                    ? "Google PageSpeed Insights API rejected the anonymous request due to IP quota limits. Configure GOOGLE_PAGESPEED_API_KEY in .env to remove this restriction."
+                                    : ex.url.endsWith(".xml")
+                                    ? "Lighthouse can only audit HTML web pages. If you intended to audit a sitemap, please use the XML Sitemap tab to discover the actual pages within it."
+                                    : "Ensure the target website is publicly accessible and allows incoming requests from auditing agents."}
+                                </p>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                                <div className="p-2.5 rounded border border-border bg-card">
-                                  <div className="text-muted-foreground text-[11px]">Total Blocking Time (TBT)</div>
-                                  <div className="font-mono font-bold text-sm mt-0.5">{formatMs(lh?.tbtMs)}</div>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-semibold text-foreground flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                                    Diagnostic Opportunities & AI Suggestions
+                                  </span>
+                                  <Link
+                                    href={`/audits/executions/${ex.id}`}
+                                    className="text-primary hover:underline text-[11px] font-medium"
+                                  >
+                                    View Full Analysis & AI Code Diffs →
+                                  </Link>
                                 </div>
-                                <div className="p-2.5 rounded border border-border bg-card">
-                                  <div className="text-muted-foreground text-[11px]">First Contentful Paint (FCP)</div>
-                                  <div className="font-mono font-bold text-sm mt-0.5">{formatMs(lh?.fcpMs)}</div>
-                                </div>
-                                <div className="p-2.5 rounded border border-border bg-card">
-                                  <div className="text-muted-foreground text-[11px]">Identified Issues</div>
-                                  <div className="font-mono font-bold text-sm mt-0.5">{ex._count?.issues ?? 0} found</div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                                  <div className="p-2.5 rounded border border-border bg-card">
+                                    <div className="text-muted-foreground text-[11px]">Total Blocking Time (TBT)</div>
+                                    <div className="font-mono font-bold text-sm mt-0.5">{formatMs(lh?.tbtMs)}</div>
+                                  </div>
+                                  <div className="p-2.5 rounded border border-border bg-card">
+                                    <div className="text-muted-foreground text-[11px]">First Contentful Paint (FCP)</div>
+                                    <div className="font-mono font-bold text-sm mt-0.5">{formatMs(lh?.fcpMs)}</div>
+                                  </div>
+                                  <div className="p-2.5 rounded border border-border bg-card">
+                                    <div className="text-muted-foreground text-[11px]">Identified Issues</div>
+                                    <div className="font-mono font-bold text-sm mt-0.5">{ex._count?.issues ?? 0} found</div>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            )}
                           </td>
                         </tr>
                       )}

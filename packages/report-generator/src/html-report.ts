@@ -268,3 +268,4 @@ export function generateExecutiveHTMLReport(report: AuditReportData): string {
 </body>
 </html>`;
 }
+
