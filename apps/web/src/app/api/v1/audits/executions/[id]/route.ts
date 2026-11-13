@@ -72,3 +72,54 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const workspace = await getOrCreateDefaultWorkspace();
+
+    const execution = await prisma.auditExecution.findFirst({
+      where: { id, auditJob: { workspaceId: workspace.id } },
+      select: { id: true, auditJobId: true },
+    });
+
+    if (!execution) {
+      return NextResponse.json({ error: "Audit execution not found" }, { status: 404 });
+    }
+
+    await prisma.auditExecution.delete({
+      where: { id },
+    });
+
+    // Update job counters
+    const remaining = await prisma.auditExecution.count({
+      where: { auditJobId: execution.auditJobId },
+    });
+    const completed = await prisma.auditExecution.count({
+      where: { auditJobId: execution.auditJobId, status: "COMPLETED" },
+    });
+    const failed = await prisma.auditExecution.count({
+      where: { auditJobId: execution.auditJobId, status: "FAILED" },
+    });
+
+    await prisma.auditJob.update({
+      where: { id: execution.auditJobId },
+      data: {
+        totalUrls: remaining,
+        completedUrls: completed,
+        failedUrls: failed,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Audit execution deleted successfully",
+    });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+  }
+}
+
+

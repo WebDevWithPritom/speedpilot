@@ -39,7 +39,7 @@ export function MetricBadge({ score, label, category, size = "md" }: MetricBadge
 
   if (score == null) {
     return (
-      <div className={`inline-flex items-center justify-center rounded-full border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-400 text-xs`}>
+      <div className={`inline-flex items-center justify-center rounded-full border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-400 ${sizeClasses[size]}`}>
         —
       </div>
     );

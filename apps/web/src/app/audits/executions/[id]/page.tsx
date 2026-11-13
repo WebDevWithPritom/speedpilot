@@ -38,6 +38,7 @@ import {
   Terminal,
   ArrowRight,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { MetricBadge } from "@/components/ui/MetricBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";

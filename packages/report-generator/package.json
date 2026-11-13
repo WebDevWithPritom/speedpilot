@@ -5,15 +5,13 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "type-check": "tsc --noEmit",
-    "test:unit": "vitest run"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@speedpilot/shared": "^1.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "typescript": "^5.7.2"
   }
 }
 

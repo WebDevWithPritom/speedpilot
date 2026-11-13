@@ -278,6 +278,35 @@ Exported from SpeedPilot SaaS Team Console`;
     }
   };
 
+  const handleDeleteExecution = async (executionId: string, url: string) => {
+    const confirmed = window.confirm(`Delete audit execution for "${url}"?`);
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/v1/audits/executions/${executionId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete execution");
+      }
+      setJobData((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          executions: (prev.executions || []).filter((e: any) => e.id !== executionId),
+          progress: {
+            ...prev.progress,
+            total: Math.max(0, prev.progress.total - 1),
+          },
+        };
+      });
+      showToast("Execution deleted successfully.");
+    } catch (err: unknown) {
+      alert((err as Error).message || "Error deleting execution");
+    }
+  };
+
   const isJobRunning =
     jobData.status === "PROCESSING" || jobData.status === "PENDING" || jobData.status === "QUEUED";
 
@@ -322,13 +351,17 @@ Exported from SpeedPilot SaaS Team Console`;
                     e.status,
                   ]),
                 ];
-                const csvContent = "data:text/csv;charset=utf-8," + rows.map((r) => r.join(",")).join("\n");
-                const encodedUri = encodeURI(csvContent);
+                const csvString = rows
+                  .map((r) => r.map((cell: unknown) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+                  .join("\r\n");
+                const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
+                link.setAttribute("href", url);
                 link.setAttribute("download", `speedpilot_audit_${jobId.slice(0, 8)}.csv`);
                 document.body.appendChild(link);
                 link.click();
+                URL.revokeObjectURL(url);
               }}
               className="px-3 py-1.5 rounded border border-border text-xs font-medium hover:bg-secondary transition flex items-center gap-1.5"
             >
@@ -922,12 +955,22 @@ Exported from SpeedPilot SaaS Team Console`;
 
                         {/* Action Link */}
                         <td className="py-2 px-3 text-right">
-                          <Link
-                            href={`/audits/executions/${ex.id}`}
-                            className="px-2.5 py-1 rounded bg-secondary hover:bg-secondary/80 text-[11px] font-semibold transition"
-                          >
-                            Deep Dive
-                          </Link>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Link
+                              href={`/audits/executions/${ex.id}`}
+                              className="px-2.5 py-1 rounded bg-secondary hover:bg-secondary/80 text-[11px] font-semibold transition"
+                            >
+                              Deep Dive
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExecution(ex.id, ex.url)}
+                              title="Delete Execution"
+                              className="p-1 rounded text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
 

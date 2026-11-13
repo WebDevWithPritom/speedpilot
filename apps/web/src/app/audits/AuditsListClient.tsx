@@ -111,7 +111,7 @@ export function AuditsListClient({ initialJobs }: AuditsListClientProps) {
                 <span>•</span>
                 <span>Source: {job.source.toLowerCase().replace("_", " ")}</span>
                 <span>•</span>
-                <span>{new Date(job.createdAt).toLocaleString()}</span>
+                <span suppressHydrationWarning>{new Date(job.createdAt).toLocaleString()}</span>
               </div>
             </div>
 
