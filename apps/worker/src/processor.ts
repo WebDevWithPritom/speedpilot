@@ -96,8 +96,37 @@ export async function processAuditJob(job: Job<AuditJobPayload>): Promise<void> 
       });
     }
 
-    // 8. Persist Issues and AI Recommendations
-    for (const issue of psiResult.issues) {
+    // 8. Persist Issues and AI Recommendations (Lighthouse diagnostics + Live Technical SEO crawler findings)
+    const allIssuesToPersist: Array<{
+      code: string;
+      title: string;
+      category: "PERFORMANCE" | "ACCESSIBILITY" | "BEST_PRACTICES" | "SEO" | "TECHNICAL_SEO";
+      severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+      displayValue: string | undefined;
+      evidenceDetails: any;
+    }> = psiResult.issues.map((i) => ({
+      code: i.code,
+      title: i.title,
+      category: i.category,
+      severity: i.severity,
+      displayValue: i.displayValue,
+      evidenceDetails: i.evidenceItems,
+    }));
+
+    if (seoInspection && seoInspection.issues && seoInspection.issues.length > 0) {
+      for (const seoIssue of seoInspection.issues) {
+        allIssuesToPersist.push({
+          code: seoIssue.code,
+          title: seoIssue.title,
+          category: "SEO",
+          severity: seoIssue.severity,
+          displayValue: seoIssue.displayValue,
+          evidenceDetails: [{ url, explanation: seoIssue.evidence }],
+        });
+      }
+    }
+
+    for (const issue of allIssuesToPersist) {
       const createdIssue = await prisma.auditIssue.create({
         data: {
           auditExecutionId: executionId,
@@ -106,7 +135,7 @@ export async function processAuditJob(job: Job<AuditJobPayload>): Promise<void> 
           category: issue.category,
           severity: issue.severity,
           displayValue: issue.displayValue,
-          evidenceDetails: issue.evidenceItems,
+          evidenceDetails: issue.evidenceDetails,
         },
       });
 
@@ -116,7 +145,15 @@ export async function processAuditJob(job: Job<AuditJobPayload>): Promise<void> 
           const aiResult = await generateAIFixRecommendation({
             targetUrl: url,
             techStack: detectedStack,
-            issue,
+            issue: {
+              code: issue.code,
+              title: issue.title,
+              category: issue.category,
+              severity: issue.severity,
+              displayValue: issue.displayValue,
+              score: 0.5,
+              evidenceItems: issue.evidenceDetails,
+            },
           });
 
           await prisma.aIRecommendation.create({

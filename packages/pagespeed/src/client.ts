@@ -26,9 +26,13 @@ export class PageSpeedClient {
    * falls back to the deterministic testing simulation.
    */
   async runAudit(url: string, device: SingleDevice): Promise<ParsedPageSpeedResult> {
-    const isDryRunExplicit = process.env.DRY_RUN === "true";
+    const isDryRunExplicit =
+      process.env.DRY_RUN === "true" ||
+      process.env.DRY_RUN_FALLBACK === "true" ||
+      !this.apiKey;
+
     if (isDryRunExplicit) {
-      console.log(`[PageSpeedClient] DRY_RUN=true: Returning simulated metrics for ${url} (${device})`);
+      console.log(`[PageSpeedClient] Dry-Run Mode active (API key absent or DRY_RUN configured): Generating realistic benchmark for ${url} (${device})`);
       return generateDryRunSimulation(url, device);
     }
 

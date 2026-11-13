@@ -18,6 +18,16 @@ import { parseBulkUrlString, validateAndNormalizeUrl } from "@speedpilot/shared"
 
 type InputTab = "single" | "textarea" | "csv" | "sitemap";
 
+interface ChildSitemap {
+  url: string;
+  fileName: string;
+  label: string;
+  description: string;
+  isRecommended: boolean;
+  urlCount: number;
+  urls: string[];
+}
+
 export default function NewAuditPage() {
   const router = useRouter();
 
@@ -28,6 +38,9 @@ export default function NewAuditPage() {
   const [sitemapUrl, setSitemapUrl] = useState("");
   const [sitemapLoading, setSitemapLoading] = useState(false);
   const [sitemapDiscovered, setSitemapDiscovered] = useState<string[]>([]);
+  const [isSitemapIndex, setIsSitemapIndex] = useState(false);
+  const [childSitemaps, setChildSitemaps] = useState<ChildSitemap[]>([]);
+  const [selectedChildUrls, setSelectedChildUrls] = useState<Set<string>>(new Set());
   const [deviceMode, setDeviceMode] = useState<"MOBILE" | "DESKTOP" | "BOTH">("BOTH");
 
   // Project state
@@ -73,23 +86,76 @@ export default function NewAuditPage() {
     if (!sitemapUrl) return;
     setSitemapLoading(true);
     setError(null);
+    setChildSitemaps([]);
+    setSelectedChildUrls(new Set());
+    setIsSitemapIndex(false);
 
     try {
       const res = await fetch("/api/v1/sitemaps/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sitemapUrl, maxUrls: 50 }),
+        body: JSON.stringify({ sitemapUrl, maxUrls: 100 }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Failed to parse sitemap");
       }
-      setSitemapDiscovered(data.urls || []);
+
+      const isIndex = Boolean(data.isSitemapIndex);
+      setIsSitemapIndex(isIndex);
+
+      if (isIndex && data.childSitemaps && data.childSitemaps.length > 0) {
+        setChildSitemaps(data.childSitemaps);
+        // Default to selecting all child sitemaps that contain pages
+        const activeSet = new Set<string>(
+          data.childSitemaps.filter((c: ChildSitemap) => c.urlCount > 0).map((c: ChildSitemap) => c.url)
+        );
+        setSelectedChildUrls(activeSet);
+
+        // Aggregate URLs from active sitemaps
+        const combinedUrls = data.childSitemaps
+          .filter((c: ChildSitemap) => activeSet.has(c.url))
+          .flatMap((c: ChildSitemap) => c.urls);
+        setSitemapDiscovered(Array.from(new Set(combinedUrls)));
+      } else {
+        setSitemapDiscovered(data.urls || []);
+      }
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
       setSitemapLoading(false);
     }
+  };
+
+  // Toggle individual child sitemap selection
+  const handleToggleChildSitemap = (childUrl: string) => {
+    const nextSet = new Set(selectedChildUrls);
+    if (nextSet.has(childUrl)) {
+      nextSet.delete(childUrl);
+    } else {
+      nextSet.add(childUrl);
+    }
+    setSelectedChildUrls(nextSet);
+
+    const combinedUrls = childSitemaps
+      .filter((c) => nextSet.has(c.url))
+      .flatMap((c) => c.urls);
+    setSitemapDiscovered(Array.from(new Set(combinedUrls)));
+  };
+
+  // Quick select actions
+  const selectAllChildSitemaps = () => {
+    const allSet = new Set(childSitemaps.map((c) => c.url));
+    setSelectedChildUrls(allSet);
+    const combinedUrls = childSitemaps.flatMap((c) => c.urls);
+    setSitemapDiscovered(Array.from(new Set(combinedUrls)));
+  };
+
+  const selectRecommendedChildSitemaps = () => {
+    const recSet = new Set(childSitemaps.filter((c) => c.isRecommended).map((c) => c.url));
+    setSelectedChildUrls(recSet);
+    const combinedUrls = childSitemaps.filter((c) => recSet.has(c.url)).flatMap((c) => c.urls);
+    setSitemapDiscovered(Array.from(new Set(combinedUrls)));
   };
 
   // Submit Audit
@@ -317,39 +383,123 @@ export default function NewAuditPage() {
 
           {/* XML Sitemap Tab */}
           {activeTab === "sitemap" && (
-            <div className="space-y-3">
-              <label className="text-xs font-medium text-muted-foreground">XML Sitemap URL</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="https://example.com/sitemap.xml"
-                  value={sitemapUrl}
-                  onChange={(e) => setSitemapUrl(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-md border border-input bg-background text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <button
-                  type="button"
-                  onClick={handleDiscoverSitemap}
-                  disabled={sitemapLoading || !sitemapUrl}
-                  className="px-4 py-2 rounded-md bg-secondary text-xs font-semibold hover:bg-secondary/80 transition flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  {sitemapLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
-                  Discover URLs
-                </button>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">XML Sitemap or Sitemap Index URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="https://example.com/sitemap.xml"
+                    value={sitemapUrl}
+                    onChange={(e) => setSitemapUrl(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-md border border-input bg-background text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleDiscoverSitemap}
+                    disabled={sitemapLoading || !sitemapUrl}
+                    className="px-4 py-2 rounded-md bg-secondary text-xs font-semibold hover:bg-secondary/80 transition flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+                  >
+                    {sitemapLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                    Discover URLs
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Works with both standard <code className="font-mono bg-secondary px-1 py-0.5 rounded">&lt;urlset&gt;</code> sitemaps and nested <code className="font-mono bg-secondary px-1 py-0.5 rounded">&lt;sitemapindex&gt;</code> files.
+                </p>
               </div>
 
-              {sitemapDiscovered.length > 0 && (
-                <div className="p-3 rounded border border-border bg-secondary/30 text-xs">
-                  <div className="font-semibold text-emerald-500 flex items-center gap-1.5 mb-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Discovered {sitemapDiscovered.length} URLs from Sitemap
+              {/* Sitemap Index Multi-Sitemap Breakdown */}
+              {isSitemapIndex && childSitemaps.length > 0 && (
+                <div className="p-4 rounded-lg border border-blue-500/20 bg-blue-500/5 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-500/10 pb-2">
+                    <div>
+                      <h3 className="text-xs font-semibold text-blue-500 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5" />
+                        Sitemap Index Detected ({childSitemaps.length} Sub-Sitemaps Found)
+                      </h3>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        This site divides its content into specialized sub-sitemaps. Select which groups you want to audit below:
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={selectAllChildSitemaps}
+                        className="px-2 py-1 rounded bg-secondary hover:bg-secondary/80 font-medium transition"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={selectRecommendedChildSitemaps}
+                        className="px-2 py-1 rounded bg-secondary hover:bg-secondary/80 font-medium transition text-primary"
+                      >
+                        Articles & Pages Only
+                      </button>
+                    </div>
                   </div>
-                  <div className="max-h-32 overflow-y-auto space-y-1 font-mono text-[11px] text-muted-foreground">
-                    {sitemapDiscovered.slice(0, 10).map((u, i) => (
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {childSitemaps.map((child) => {
+                      const isSelected = selectedChildUrls.has(child.url);
+                      return (
+                        <div
+                          key={child.url}
+                          onClick={() => handleToggleChildSitemap(child.url)}
+                          className={`p-2.5 rounded-md border text-left cursor-pointer transition flex items-start gap-2.5 ${
+                            isSelected
+                              ? "border-primary bg-primary/10 shadow-sm"
+                              : "border-border bg-card/60 opacity-60 hover:opacity-100"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}} // Handled by container onClick
+                            className="mt-0.5 h-3.5 w-3.5 rounded border-border text-primary focus:ring-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-semibold truncate text-foreground">{child.label}</span>
+                              <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
+                                {child.urlCount} URLs
+                              </span>
+                            </div>
+                            <div className="text-[11px] font-mono text-muted-foreground truncate mt-0.5">
+                              {child.fileName}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/80 mt-1 line-clamp-1">
+                              {child.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Discovered URLs preview */}
+              {sitemapDiscovered.length > 0 && (
+                <div className="p-3.5 rounded-lg border border-border bg-secondary/20 text-xs space-y-2">
+                  <div className="font-semibold text-emerald-500 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Ready to Audit: {sitemapDiscovered.length} Selected Web Page URLs
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-normal">
+                      Filtered & XMLs excluded
+                    </span>
+                  </div>
+                  <div className="max-h-36 overflow-y-auto space-y-1 font-mono text-[11px] text-muted-foreground bg-background/50 p-2 rounded border border-border/50">
+                    {sitemapDiscovered.slice(0, 15).map((u, i) => (
                       <div key={i} className="truncate">• {u}</div>
                     ))}
-                    {sitemapDiscovered.length > 10 && (
-                      <div className="italic text-muted-foreground/60">+ {sitemapDiscovered.length - 10} more URLs</div>
+                    {sitemapDiscovered.length > 15 && (
+                      <div className="italic text-muted-foreground/60 pt-1">
+                        + {sitemapDiscovered.length - 15} more URLs ready for execution
+                      </div>
                     )}
                   </div>
                 </div>
