@@ -21,9 +21,9 @@ export function validateAndNormalizeUrl(rawInput: string): URLValidationResult {
     return { isValid: false, error: "URL string cannot be empty." };
   }
 
-  // Prepend https:// if protocol is missing
+  // Prepend https:// only if scheme is missing
   let candidate = trimmed;
-  if (!/^https?:\/\//i.test(candidate)) {
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(candidate)) {
     candidate = `https://${candidate}`;
   }
 

@@ -93,16 +93,22 @@ export async function DELETE(
       where: { id },
     });
 
-    // Update job counters
-    const remaining = await prisma.auditExecution.count({
+    // Update job counters in a single grouped query
+    const statusGroups = await prisma.auditExecution.groupBy({
+      by: ["status"],
       where: { auditJobId: execution.auditJobId },
+      _count: { id: true },
     });
-    const completed = await prisma.auditExecution.count({
-      where: { auditJobId: execution.auditJobId, status: "COMPLETED" },
-    });
-    const failed = await prisma.auditExecution.count({
-      where: { auditJobId: execution.auditJobId, status: "FAILED" },
-    });
+
+    let remaining = 0;
+    let completed = 0;
+    let failed = 0;
+
+    for (const group of statusGroups) {
+      remaining += group._count.id;
+      if (group.status === "COMPLETED") completed = group._count.id;
+      if (group.status === "FAILED") failed = group._count.id;
+    }
 
     await prisma.auditJob.update({
       where: { id: execution.auditJobId },

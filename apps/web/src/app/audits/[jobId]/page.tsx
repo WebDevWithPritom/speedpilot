@@ -292,12 +292,30 @@ Exported from SpeedPilot SaaS Team Console`;
       }
       setJobData((prev: any) => {
         if (!prev) return prev;
+        const target = (prev.executions || []).find((e: any) => e.id === executionId);
+        const isCompleted = target?.status === "COMPLETED";
+        const isFailed = target?.status === "FAILED";
+
+        const nextTotal = Math.max(0, (prev.progress?.total ?? 1) - 1);
+        const nextCompleted = isCompleted
+          ? Math.max(0, (prev.progress?.completed ?? 1) - 1)
+          : (prev.progress?.completed ?? 0);
+        const nextFailed = isFailed
+          ? Math.max(0, (prev.progress?.failed ?? 1) - 1)
+          : (prev.progress?.failed ?? 0);
+        const nextPct =
+          nextTotal > 0
+            ? Math.min(100, Math.round(((nextCompleted + nextFailed) / nextTotal) * 100))
+            : 0;
+
         return {
           ...prev,
           executions: (prev.executions || []).filter((e: any) => e.id !== executionId),
           progress: {
-            ...prev.progress,
-            total: Math.max(0, prev.progress.total - 1),
+            total: nextTotal,
+            completed: nextCompleted,
+            failed: nextFailed,
+            percentage: nextPct,
           },
         };
       });
