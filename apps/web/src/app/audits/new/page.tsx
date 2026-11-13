@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { getClientAIConfig } from "@/lib/ai-config";
 import {
   Zap,
@@ -31,6 +32,7 @@ import {
   ArrowRight,
   FolderKanban,
   RefreshCw,
+  Key,
 } from "lucide-react";
 import { parseBulkUrlString, validateAndNormalizeUrl } from "@speedpilot/shared";
 
@@ -91,6 +93,15 @@ export default function NewAuditPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasCustomGoogleKey, setHasCustomGoogleKey] = useState(false);
+
+  useEffect(() => {
+    try {
+      setHasCustomGoogleKey(!!localStorage.getItem("sp_google_key"));
+    } catch {
+      // Ignore
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/v1/projects")
@@ -428,6 +439,18 @@ export default function NewAuditPage() {
               <ShieldCheck className="w-3 h-3" />
               SSRF Guard Active
             </span>
+            <Link
+              href="/settings"
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition ${
+                hasCustomGoogleKey
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
+                  : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+              }`}
+              title="Click to configure or change your free Google & AI API keys in Settings"
+            >
+              <Key className="w-3 h-3" />
+              <span>{hasCustomGoogleKey ? "Custom Google Key: Active" : "Add Your Free Google API Key"}</span>
+            </Link>
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
             Launch Performance Audit

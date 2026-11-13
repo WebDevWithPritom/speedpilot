@@ -13,6 +13,10 @@ import {
   Smartphone,
   Monitor,
   RefreshCw,
+  Key,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface AuditScores {
@@ -73,10 +77,25 @@ function getScoreBadge(score: number) {
 export function InstantAuditBar() {
   const [url, setUrl] = useState("");
   const [device, setDevice] = useState<"MOBILE" | "DESKTOP">("MOBILE");
+  const [apiKey, setApiKey] = useState("");
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TrialResult | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
+
+  // Auto-detect existing BYOK key from browser session
+  React.useEffect(() => {
+    try {
+      const savedKey = localStorage.getItem("sp_google_key");
+      if (savedKey) {
+        setApiKey(savedKey);
+        setShowApiKeyInput(true);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
 
   const steps = [
     "Connecting to Google Lighthouse lab...",
@@ -88,6 +107,15 @@ export function InstantAuditBar() {
   const handleAudit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
+
+    // Save key to browser session if provided
+    if (apiKey.trim()) {
+      try {
+        localStorage.setItem("sp_google_key", apiKey.trim());
+      } catch {
+        // Ignore
+      }
+    }
 
     setLoading(true);
     setError(null);
@@ -101,8 +129,15 @@ export function InstantAuditBar() {
     try {
       const res = await fetch("/api/v1/audits/trial", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), device }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey.trim() ? { "x-custom-google-key": apiKey.trim() } : {}),
+        },
+        body: JSON.stringify({
+          url: url.trim(),
+          device,
+          apiKey: apiKey.trim() || undefined,
+        }),
       });
 
       const data = await res.json();
@@ -203,20 +238,69 @@ export function InstantAuditBar() {
               </button>
             </div>
 
-            {/* Quick Demo Pre-fills */}
-            <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-muted-foreground">
-              <span>Try an example:</span>
-              {["github.com", "nytimes.com", "stripe.com"].map((sample) => (
-                <button
-                  key={sample}
-                  type="button"
-                  onClick={() => setUrl(`https://${sample}`)}
-                  className="px-2 py-0.5 rounded border border-border hover:bg-secondary hover:text-foreground transition cursor-pointer"
-                >
-                  {sample}
-                </button>
-              ))}
+            {/* Quick Demo Pre-fills & Custom API Key Toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-[11px] text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2">
+                <span>Try an example:</span>
+                {["github.com", "nytimes.com", "stripe.com"].map((sample) => (
+                  <button
+                    key={sample}
+                    type="button"
+                    onClick={() => setUrl(`https://${sample}`)}
+                    className="px-2 py-0.5 rounded border border-border hover:bg-secondary hover:text-foreground transition cursor-pointer"
+                  >
+                    {sample}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+                className="text-primary hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto font-medium"
+              >
+                <Key className="w-3 h-3" />
+                <span>
+                  {showApiKeyInput
+                    ? "Hide custom API key"
+                    : apiKey
+                      ? "Custom Google Key: Connected"
+                      : "Use your own Google PSI key (Optional)"}
+                </span>
+                {showApiKeyInput ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
             </div>
+
+            {/* Custom API Key Input */}
+            {showApiKeyInput && (
+              <div className="p-3 rounded-xl border border-primary/20 bg-secondary/40 space-y-2 animate-in fade-in duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px]">
+                  <label className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-primary" />
+                    <span>Your Google PageSpeed API Key</span>
+                  </label>
+                  <a
+                    href="https://developers.google.com/speed/docs/insights/v5/get-started"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>Get free key (25,000 req/day)</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="AIzaSy... (Paste to bypass shared community limits)"
+                  className="w-full px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Stored securely in your local browser storage. Never logged or shared.
+                </p>
+              </div>
+            )}
 
             {/* Loading indicator */}
             {loading && (

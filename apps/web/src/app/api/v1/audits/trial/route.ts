@@ -29,8 +29,12 @@ export async function POST(req: NextRequest) {
 
     const targetUrl = validation.normalizedUrl;
 
+    // Use custom Google PSI key if provided by user (via header or body)
+    const customKey = req.headers.get("x-custom-google-key") || body.apiKey || undefined;
+    const client = customKey ? new PageSpeedClient({ apiKey: customKey }) : psiClient;
+
     // Run PSI single page test
-    const result = await psiClient.runAudit(targetUrl, device);
+    const result = await client.runAudit(targetUrl, device);
 
     // Extract top 3 highest impact opportunities
     const topOpportunities = (result.issues || [])
