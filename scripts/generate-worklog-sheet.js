@@ -481,6 +481,26 @@ function createWorkbook() {
       "Strategic Value": "Catches regressions before production deployment, embedding SpeedPilot directly into daily developer workflow."
     },
     {
+      "Milestone": "F-11",
+      "Priority": "P0 - Stream Milestone",
+      "Status": "Planned (Tomorrow Stream Priority)",
+      "Target Audience": "SEO Agencies, Marketers, Growth Engineers, SaaS Founders",
+      "Feature Name": "Zero-Cost Scratch-Built SERP Rank Tracker (DataForSEO Alternative)",
+      "Est. Hours": 3.0,
+      "Key Deliverables": "packages/seo-engine/src/serp-tracker.ts (multi-engine DOM parser & Google CSE fallback), POST /api/v1/seo/rank endpoint, 4th tab in /seo, Rank # badge, Top 10 competitor table with 1-click Spider audit, PAA question accordion, and AI rank climbing plan.",
+      "Strategic Value": "Eliminates $50/mo DataForSEO API subscription fees, providing live Google SERP ranking, competitor positions, and rank-climbing recommendations at $0 cost."
+    },
+    {
+      "Milestone": "PAY-01",
+      "Priority": "P0 - Offline Setup",
+      "Status": "Planned (Offline Tomorrow)",
+      "Target Audience": "Commercial SaaS Billing & Community Supporters",
+      "Feature Name": "Production Payment Activation (Buy Me a Coffee Link & Razorpay Live Keys)",
+      "Est. Hours": 0.5,
+      "Key Deliverables": "Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and custom Buy Me a Coffee creator URL into Vercel production environment variables and verify checkout.",
+      "Strategic Value": "Activates live payment processing and supporter donations safely without exposing secrets on stream."
+    },
+    {
       "Milestone": "F-02",
       "Priority": "P0 - Immediate",
       "Status": "Planned",
