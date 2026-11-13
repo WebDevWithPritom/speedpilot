@@ -7,6 +7,7 @@ const nextConfig = {
     "@speedpilot/pagespeed",
     "@speedpilot/seo-engine",
     "@speedpilot/ai-engine",
+    "@speedpilot/report-generator",
   ],
   experimental: {
     serverActions: {

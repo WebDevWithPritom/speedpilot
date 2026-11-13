@@ -3,7 +3,6 @@ import {
   LighthouseLabMetrics,
   CrUXFieldData,
   SEOResultData,
-  NormalizedAuditIssue,
   AIRecommendationOutput,
   SingleDevice,
 } from "@speedpilot/shared";

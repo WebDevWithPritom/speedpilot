@@ -13,6 +13,7 @@
     "@speedpilot/ai-engine": "^1.0.0",
     "@speedpilot/database": "^1.0.0",
     "@speedpilot/pagespeed": "^1.0.0",
+    "@speedpilot/report-generator": "^1.0.0",
     "@speedpilot/security": "^1.0.0",
     "@speedpilot/seo-engine": "^1.0.0",
     "@speedpilot/shared": "^1.0.0",
