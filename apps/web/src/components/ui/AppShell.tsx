@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft, Flame, Github, Star } from "lucide-react";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { Header } from "@/components/ui/Header";
+import { NavigationProgress } from "@/components/ui/NavigationProgress";
 
 interface AppShellProps {
   isAuthenticated: boolean;
@@ -23,6 +24,7 @@ export function AppShell({ isAuthenticated, initialUser, children }: AppShellPro
   if (isAuthPage || isPublicMarketing || isAdminPage) {
     return (
       <div className="flex-1 flex flex-col min-h-screen w-full bg-background">
+        <NavigationProgress />
         <div className="h-16 border-b border-border bg-card/60 backdrop-blur-md px-6 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold shadow-sm">
@@ -64,11 +66,17 @@ export function AppShell({ isAuthenticated, initialUser, children }: AppShellPro
   }
 
   if (isPublicLanding) {
-    return <div className="flex-1 flex flex-col min-h-screen w-full">{children}</div>;
+    return (
+      <div className="flex-1 flex flex-col min-h-screen w-full">
+        <NavigationProgress />
+        {children}
+      </div>
+    );
   }
 
   return (
     <>
+      <NavigationProgress />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Header initialUser={initialUser} />

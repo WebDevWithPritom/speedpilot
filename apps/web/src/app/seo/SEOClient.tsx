@@ -26,8 +26,37 @@ import {
   Check,
   Wand2,
   Code2,
+  Trophy,
+  TrendingUp,
+  Swords,
 } from "lucide-react";
+import Link from "next/link";
 import type { SEOResultData } from "@speedpilot/shared";
+
+interface SerpCompetitorItem {
+  rank: number;
+  title: string;
+  url: string;
+  domain: string;
+  snippet: string;
+}
+
+interface SerpTrackerResult {
+  keyword: string;
+  targetDomain: string;
+  targetRank: number | null;
+  targetUrl: string | null;
+  totalResultsFound: number;
+  providerUsed: "GOOGLE_CSE" | "DUCKDUCKGO_HTML";
+  competitors: SerpCompetitorItem[];
+  peopleAlsoAsk: string[];
+  aiClimbingAnalysis: {
+    gapSummary: string;
+    topCompetitorTitle: string;
+    topCompetitorDomain: string;
+    actionableTips: string[];
+  };
+}
 
 interface IssueItem {
   code: string;
@@ -80,11 +109,53 @@ export function SEOClient({ initialResults }: { initialResults: HistoricalSEOIte
   const [loading, setLoading] = useState(false);
   const [compLoading, setCompLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"spider" | "content-serp" | "health-matrix">("spider");
+  const [activeTab, setActiveTab] = useState<"spider" | "content-serp" | "health-matrix" | "rank-tracker">("spider");
   const [serpDevice, setSerpDevice] = useState<"desktop" | "mobile">("desktop");
   const [copied, setCopied] = useState(false);
   const [patchLoading, setPatchLoading] = useState(false);
   const [aiPatch, setAiPatch] = useState<AIPatchPayload | null>(null);
+
+  // SERP Rank Tracker state
+  const [rankKeyword, setRankKeyword] = useState("");
+  const [rankDomain, setRankDomain] = useState("");
+  const [rankCountry, setRankCountry] = useState("us");
+  const [rankLoading, setRankLoading] = useState(false);
+  const [rankResult, setRankResult] = useState<SerpTrackerResult | null>(null);
+  const [rankError, setRankError] = useState<string | null>(null);
+  const [copiedPaaIndex, setCopiedPaaIndex] = useState<number | null>(null);
+
+  const handleTrackRank = async (kw?: string, dom?: string) => {
+    const keywordToUse = kw || rankKeyword;
+    const domainToUse = dom || rankDomain || (targetUrl ? targetUrl.replace(/^https?:\/\//, "").split("/")[0] : "");
+    if (!keywordToUse.trim() || !domainToUse.trim()) {
+      setRankError("Please provide both a search keyword and your website domain.");
+      return;
+    }
+    setRankLoading(true);
+    setRankError(null);
+
+    try {
+      const res = await fetch("/api/v1/seo/rank", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: keywordToUse.trim(),
+          domain: domainToUse.trim(),
+          country: rankCountry,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to track SERP rank.");
+      }
+      setRankResult(data.data);
+    } catch (err: unknown) {
+      setRankError((err as Error).message);
+    } finally {
+      setRankLoading(false);
+    }
+  };
 
   // Active inspected URL state
   const [inspectedData, setInspectedData] = useState<InspectionPayload | null>(null);
@@ -255,6 +326,57 @@ export function SEOClient({ initialResults }: { initialResults: HistoricalSEOIte
         </div>
       </div>
 
+      {/* Primary Mode Switcher Tabs */}
+      <div className="border-b border-border flex items-center gap-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab("spider")}
+          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 shrink-0 ${
+            activeTab === "spider"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Link2 className="w-4 h-4 text-emerald-500" />
+          <span>Deep Spider & Crawl Architecture</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("content-serp")}
+          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 shrink-0 ${
+            activeTab === "content-serp"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Tag className="w-4 h-4 text-purple-500" />
+          <span>SERP Simulator & Content Intelligence</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("health-matrix")}
+          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 shrink-0 ${
+            activeTab === "health-matrix"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <BarChart2 className="w-4 h-4 text-blue-500" />
+          <span>Domain Health & Competitor Matrix</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("rank-tracker")}
+          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 shrink-0 ${
+            activeTab === "rank-tracker"
+              ? "border-amber-500 text-foreground font-bold"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Trophy className="w-4 h-4 text-amber-500" />
+          <span>🏆 SERP Rank Tracker (DataForSEO Alternative)</span>
+        </button>
+      </div>
+
       {/* Active Inspected URL View */}
       {inspectedData && currentSeo && (
         <div className="space-y-6">
@@ -398,45 +520,6 @@ export function SEOClient({ initialResults }: { initialResults: HistoricalSEOIte
               </div>
             </div>
           )}
-
-          {/* Mode Switcher Tabs */}
-          <div className="border-b border-border flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab("spider")}
-              className={`pb-3 px-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
-                activeTab === "spider"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Link2 className="w-4 h-4 text-emerald-500" />
-              <span>Deep Spider & Crawl Architecture</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("content-serp")}
-              className={`pb-3 px-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
-                activeTab === "content-serp"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Tag className="w-4 h-4 text-purple-500" />
-              <span>SERP Simulator & Content Intelligence</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("health-matrix")}
-              className={`pb-3 px-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
-                activeTab === "health-matrix"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <BarChart2 className="w-4 h-4 text-blue-500" />
-              <span>Domain Health & Competitor Matrix</span>
-            </button>
-          </div>
 
           {/* TAB 1: SPIDER & CRAWL ARCHITECTURE */}
           {activeTab === "spider" && (
@@ -915,6 +998,345 @@ export function SEOClient({ initialResults }: { initialResults: HistoricalSEOIte
                   </div>
                 )}
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* When Spider/SERP/Health is active but no URL inspected yet */}
+      {activeTab !== "rank-tracker" && (!inspectedData || !currentSeo) && (
+        <div className="p-8 text-center border border-dashed border-border rounded-xl bg-card/40 space-y-2">
+          <Globe className="w-8 h-8 text-muted-foreground mx-auto" />
+          <h3 className="font-semibold text-sm">Enter a Target URL to Inspect Live SEO Architecture</h3>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            Inspect heading hierarchy, internal link equity, and Schema.org rich results, or switch to the <strong>SERP Rank Tracker</strong> tab to spy on competitors.
+          </p>
+        </div>
+      )}
+
+      {/* TAB 4: ZERO-COST SERP RANK TRACKER (DataForSEO Alternative) */}
+      {activeTab === "rank-tracker" && (
+        <div className="space-y-6">
+          {/* Form Card */}
+          <div className="p-6 rounded-xl border border-border bg-gradient-to-br from-card via-card to-amber-500/5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-500" />
+                  Zero-Cost SERP Rank Tracker & Competitor Spy
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Track live Google rankings, spy on Top 10 organic competitors, and extract high-intent People Also Ask questions — $0 subscription fees.
+                </p>
+              </div>
+              <div className="inline-flex rounded-md border border-border bg-secondary/40 p-1 text-xs font-mono">
+                <span className="text-muted-foreground px-2 py-0.5">DataForSEO Alternative</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2">
+              <div className="md:col-span-5">
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Target Search Keyword
+                </label>
+                <div className="relative">
+                  <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="e.g. bulk pagespeed auditor"
+                    value={rankKeyword}
+                    onChange={(e) => setRankKeyword(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleTrackRank()}
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-input bg-background text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              <div className="md:col-span-4">
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Your Target Website Domain
+                </label>
+                <div className="relative">
+                  <Globe className="w-4 h-4 text-muted-foreground absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="e.g. speedpilot.webdevwithpritom.com"
+                    value={rankDomain}
+                    onChange={(e) => setRankDomain(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleTrackRank()}
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-input bg-background text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              <div className="md:col-span-3 flex items-end">
+                <button
+                  onClick={() => handleTrackRank()}
+                  disabled={rankLoading}
+                  className="w-full py-2 px-4 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {rankLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Scanning Google SERP...
+                    </>
+                  ) : (
+                    <>
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      Track Live Google SERP
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Suggested Quick Searches */}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pt-1">
+              <span className="font-medium text-[11px]">Quick Samples:</span>
+              {[
+                { kw: "bulk pagespeed auditor", dom: "speedpilot.webdevwithpritom.com" },
+                { kw: "core web vitals tool", dom: "debugbear.com" },
+                { kw: "website performance monitoring", dom: "speedcurve.com" },
+              ].map((sample, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setRankKeyword(sample.kw);
+                    setRankDomain(sample.dom);
+                    handleTrackRank(sample.kw, sample.dom);
+                  }}
+                  className="px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground transition text-[11px] font-mono"
+                >
+                  &quot;{sample.kw}&quot;
+                </button>
+              ))}
+            </div>
+
+            {rankError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-500 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{rankError}</span>
+              </div>
+            )}
+          </div>
+
+          {/* RANK RESULTS */}
+          {rankResult && (
+            <div className="space-y-6">
+              {/* Top Hero Rank Showcase */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div className="md:col-span-4 p-5 rounded-xl border border-border bg-card shadow-sm flex flex-col justify-between space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Google SERP Position
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-secondary text-foreground">
+                      {rankResult.providerUsed === "GOOGLE_CSE" ? "Official Google CSE" : "Zero-Key Web SERP"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline gap-3">
+                    <span
+                      className={`text-5xl font-black font-mono tracking-tight ${
+                        rankResult.targetRank === 1
+                          ? "text-emerald-500"
+                          : rankResult.targetRank && rankResult.targetRank <= 3
+                          ? "text-emerald-400"
+                          : rankResult.targetRank && rankResult.targetRank <= 10
+                          ? "text-blue-500"
+                          : rankResult.targetRank
+                          ? "text-amber-500"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {rankResult.targetRank ? `#${rankResult.targetRank}` : "Not in Top 10"}
+                    </span>
+                    <div className="text-xs text-muted-foreground">
+                      {rankResult.targetRank === 1
+                        ? "Ranked #1 on Google"
+                        : rankResult.targetRank
+                        ? `Ranked on Page 1`
+                        : `Needs optimization to enter Page 1`}
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground font-mono truncate">
+                    Domain: <strong className="text-foreground">{rankResult.targetDomain}</strong>
+                  </div>
+                </div>
+
+                {/* AI Gap & Strategy Box */}
+                <div className="md:col-span-8 p-5 rounded-xl border border-border bg-card shadow-sm space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        Autonomous AI Rank-Climbing Strategy
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        Target: &quot;{rankResult.keyword}&quot;
+                      </span>
+                    </div>
+                    <p className="text-xs font-medium text-foreground mt-2">
+                      {rankResult.aiClimbingAnalysis.gapSummary}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
+                    {rankResult.aiClimbingAnalysis.actionableTips.map((tip, idx) => (
+                      <div key={idx} className="p-2.5 rounded-lg bg-secondary/30 border border-border flex items-start gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                        <span className="text-[11px] leading-relaxed">{tip}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Top 10 Competitors Table */}
+              <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+                <div className="p-4 bg-secondary/30 border-b border-border flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-amber-500" />
+                    <h3 className="text-xs font-bold text-foreground">
+                      Live Google Top 10 Organic Competitors
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    {rankResult.competitors.length} organic positions analyzed
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-secondary/20 text-muted-foreground border-b border-border font-medium">
+                      <tr>
+                        <th className="py-2.5 px-3 text-center w-12">Rank</th>
+                        <th className="py-2.5 px-4">Competitor & Snippet</th>
+                        <th className="py-2.5 px-3">Domain</th>
+                        <th className="py-2.5 px-4 text-right">Instant Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {rankResult.competitors.map((comp) => {
+                        const isUserSite = comp.domain === rankResult.targetDomain;
+                        return (
+                          <tr key={comp.rank} className={isUserSite ? "bg-primary/5 font-medium" : "hover:bg-secondary/10"}>
+                            <td className="py-3 px-3 text-center font-mono">
+                              <span
+                                className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                                  comp.rank === 1
+                                    ? "bg-amber-500/20 text-amber-500 border border-amber-500/30"
+                                    : comp.rank <= 3
+                                    ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/30"
+                                    : "bg-secondary text-muted-foreground"
+                                }`}
+                              >
+                                {comp.rank}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 max-w-md">
+                              <div className="font-semibold text-foreground flex items-center gap-1.5">
+                                <span>{comp.title}</span>
+                                {isUserSite && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-primary text-primary-foreground font-bold">
+                                    YOUR SITE
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                                {comp.snippet || "No meta snippet available"}
+                              </p>
+                            </td>
+                            <td className="py-3 px-3 font-mono text-muted-foreground text-xs">
+                              <a
+                                href={comp.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hover:text-primary transition flex items-center gap-1"
+                              >
+                                <span>{comp.domain}</span>
+                                <ExternalLink className="w-3 h-3 opacity-60" />
+                              </a>
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="inline-flex items-center gap-1.5">
+                                <Link
+                                  href={`/comparisons`}
+                                  className="px-2 py-1 rounded bg-secondary hover:bg-secondary/80 text-[11px] font-semibold transition inline-flex items-center gap-1"
+                                  title="Run Core Web Vitals Battle against this competitor"
+                                >
+                                  <Swords className="w-3 h-3 text-primary" />
+                                  <span>Battle</span>
+                                </Link>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTargetUrl(comp.url);
+                                    setActiveTab("spider");
+                                    handleInspect(comp.url);
+                                  }}
+                                  className="px-2 py-1 rounded bg-secondary hover:bg-secondary/80 text-[11px] font-semibold transition inline-flex items-center gap-1"
+                                  title="Inspect competitor's heading tree and link equity"
+                                >
+                                  <Link2 className="w-3 h-3 text-emerald-500" />
+                                  <span>Spider</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* People Also Ask (PAA) Accordion / Cards */}
+              {rankResult.peopleAlsoAsk && rankResult.peopleAlsoAsk.length > 0 && (
+                <div className="p-5 rounded-xl border border-border bg-card shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-purple-500" />
+                      <h3 className="text-xs font-bold text-foreground">
+                        Google &quot;People Also Ask&quot; Search Intent Queries
+                      </h3>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">
+                      Copy queries directly into your content FAQs to rank higher
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    {rankResult.peopleAlsoAsk.map((paa, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-lg bg-secondary/30 border border-border flex items-center justify-between gap-3 text-xs"
+                      >
+                        <span className="font-medium text-foreground">{paa}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(paa);
+                            setCopiedPaaIndex(idx);
+                            setTimeout(() => setCopiedPaaIndex(null), 2000);
+                          }}
+                          className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition shrink-0"
+                          title="Copy Question"
+                        >
+                          {copiedPaaIndex === idx ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

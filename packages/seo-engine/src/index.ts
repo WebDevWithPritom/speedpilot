@@ -3,4 +3,4 @@ export * from "./parser.js";
 export * from "./crawler.js";
 export * from "./agentic-crawler.js";
 export * from "./ai-recon.js";
-
+export * from "./serp-tracker.js";
