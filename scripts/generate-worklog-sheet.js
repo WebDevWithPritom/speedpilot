@@ -403,137 +403,160 @@ function createWorkbook() {
     { "Metric": "Total Logged Tasks", "Value": worklogData.length },
     { "Metric": "Total Estimated Hours", "Value": worklogData.reduce((acc, c) => acc + c["Est. Hours"], 0) },
     { "Metric": "Total Actual Hours Spent", "Value": worklogData.reduce((acc, c) => acc + c["Actual Hours"], 0) },
-    { "Metric": "Project Status", "Value": "Active Development (Production Ready v1.0)" },
+    { "Metric": "Project Status", "Value": "Production Live (v1.0.0 Ready)" },
+    { "Metric": "Live Production URL", "Value": "https://speedpilot.webdevwithpritom.com" },
     { "Metric": "Completed Tasks", "Value": worklogData.filter(t => t.Status === "Completed").length },
     { "Metric": "In Progress Tasks", "Value": worklogData.filter(t => t.Status === "In Progress").length },
     { "Metric": "", "Value": "" },
-    { "Metric": "--- Hours By Category ---", "Value": "" },
-    { "Metric": "Frontend UI & UX", "Value": "6.5 hrs" },
-    { "Metric": "Core Architecture & Performance", "Value": "8.5 hrs" },
-    { "Metric": "DevOps & Deployment", "Value": "4.0 hrs" },
-    { "Metric": "SEO & Agentic Browsing", "Value": "3.5 hrs" },
-    { "Metric": "AI Autonomous Recon & Discovery", "Value": "3.0 hrs" },
-    { "Metric": "Security & Middleware Auth", "Value": "3.0 hrs" },
-    { "Metric": "Audience Intelligence & Personas", "Value": "2.5 hrs" },
-    { "Metric": "Database & Laragon MySQL", "Value": "2.0 hrs" },
-    { "Metric": "Project Management & Logging", "Value": "1.0 hrs" }
+    { "Metric": "--- Hours By Engineering Category ---", "Value": "" },
+    { "Metric": "Frontend UI & UX Polish", "Value": "16.0 hrs" },
+    { "Metric": "Core Architecture & Turbo Engine", "Value": "14.5 hrs" },
+    { "Metric": "Performance Telemetry & PageSpeed/CrUX", "Value": "11.0 hrs" },
+    { "Metric": "Multi-Model AI Engine & Waterfall", "Value": "10.5 hrs" },
+    { "Metric": "Technical SEO Suite (Spider, Semrush, Ahrefs)", "Value": "9.5 hrs" },
+    { "Metric": "DevOps, Vercel & Edge Deployment", "Value": "8.0 hrs" },
+    { "Metric": "Multi-Tenant Security & SSRF Protection", "Value": "6.5 hrs" },
+    { "Metric": "Audience Personas & Remediation Patch Studio", "Value": "5.5 hrs" },
+    { "Metric": "Billing & Subscriptions (Razorpay Checkout)", "Value": "4.0 hrs" },
+    { "Metric": "Audit Management & Cascade Cleanup", "Value": "2.5 hrs" },
+    { "Metric": "Strategic Research, Documentation & Worklog", "Value": "3.5 hrs" }
   ];
 
   const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-  wsSummary['!cols'] = [{ wch: 35 }, { wch: 35 }];
+  wsSummary['!cols'] = [{ wch: 45 }, { wch: 40 }];
   XLSX.utils.book_append_sheet(wb, wsSummary, "Summary & Metrics");
 
   // Sheet 3: Product Roadmap & Master TODO List
   const roadmapData = [
     {
-      "Milestone": "SP-17",
+      "Milestone": "SP-27",
       "Priority": "P0 - Immediate",
       "Status": "Completed",
-      "Target Audience": "Developers, Marketers, Agencies, SaaS Teams",
-      "Feature Name": "1-Click Git Diff & Multi-Persona Remediation Patch Studio",
+      "Target Audience": "Hosted Cloud SaaS & Commercial Agency Users",
+      "Feature Name": "Razorpay Payment Gateway & Subscription Gating",
+      "Est. Hours": 3.0,
+      "Key Deliverables": "Razorpay order creation (/api/v1/billing/checkout), webhook verification (/api/v1/billing/webhook), and subscription entitlement validation (hasActiveSubscription, getWorkspaceTierLimits).",
+      "Strategic Value": "Unlocks SaaS monetization, credit tiers, and agency subscription management directly in SpeedPilot."
+    },
+    {
+      "Milestone": "SP-30",
+      "Priority": "P0 - Immediate",
+      "Status": "Completed",
+      "Target Audience": "SEO Agencies, Marketers, Growth Engineers",
+      "Feature Name": "All-in-One SEO Suite (Spider Crawl, Semrush On-Page, Ahrefs Health)",
       "Est. Hours": 2.5,
-      "Key Deliverables": "Interactive Git Diff viewer (before vs after), .patch file download, copy-paste PR code, SEO conversion lift impact, client agency proposal slide, and Jira/Linear story exporter.",
-      "Strategic Value": "Turns raw Lighthouse warnings into copy-paste solutions for developers and revenue-generating proposals for agencies."
+      "Key Deliverables": "Screaming Frog Spider mode (link equity, heading tree, indexability), Semrush mode (600px pixel-width Google SERP simulator, TF-IDF keyword density), Ahrefs mode (Site health score, Schema.org rich types, OpenGraph cards, Competitor Gap Analyzer).",
+      "Strategic Value": "Replaces 3 expensive legacy subscriptions ($3,000+/yr) with one integrated SpeedPilot engine."
     },
     {
-      "Milestone": "SP-18",
+      "Milestone": "SP-31",
       "Priority": "P0 - Immediate",
       "Status": "Completed",
-      "Target Audience": "Enterprise Agencies & Large Scale Auditing",
-      "Feature Name": "Audit Engine Turbo Concurrency (8x Speedup) & Sitemap Limit Unlock",
-      "Est. Hours": 2.0,
-      "Key Deliverables": "Parallelized PageSpeed Insights + SEO crawling (Promise.all), increased concurrency pool to 8 parallel benchmark sessions, unlocked 100 URL limit on sitemaps to audit 200, 500, 1,000, or All URLs.",
-      "Strategic Value": "Enables marketers and agencies to audit huge sites with hundreds of pages in minutes instead of hours."
+      "Target Audience": "All Users & Enterprise Workspace Teams",
+      "Feature Name": "Permanent Audit & Execution Deletion with Cascade Cleanup",
+      "Est. Hours": 1.0,
+      "Key Deliverables": "DELETE /api/v1/audits/[jobId] & DELETE /api/v1/audits/executions/[id], foreign-key cascading, optimistic UI removal, row deletion on results table, 3-dot execution menu action, MetricBadge sizing fix, suppressHydrationWarning timestamps, and Blob-based CSV export.",
+      "Strategic Value": "Guarantees workspace data hygiene, GDPR compliance, and immediate client-side UI responsiveness."
     },
     {
-      "Milestone": "SP-19",
+      "Milestone": "F-01",
       "Priority": "P0 - Immediate",
-      "Status": "Completed",
-      "Target Audience": "All Users (Developers, Marketers, Agencies)",
-      "Feature Name": "Multi-Model AI Router (DeepSeek, Groq / Qwen, Ollama Local)",
-      "Est. Hours": 2.5,
-      "Key Deliverables": "Pluggable OpenAI-compatible LLM router supporting Google Gemini, Groq (Llama 3.3 70B & Qwen 2.5 Coder), DeepSeek-V3 & R1, local offline Ollama models, and custom endpoints with BYOK and stream protection.",
-      "Strategic Value": "Cuts AI API costs to near zero, provides 500 token/sec response speeds, and allows 100% offline air-gapped enterprise audits."
+      "Status": "Planned (Next Up)",
+      "Target Audience": "DevOps Engineers, Software Developers, Engineering Teams",
+      "Feature Name": "AI-Automated CI/CD Regression Guard & PR Patch Bot",
+      "Est. Hours": 4.5,
+      "Key Deliverables": "GitHub Action (speedpilot/action-guard@v1) triggering on Pull Requests against ephemeral preview URLs (Vercel/Netlify), budget evaluation, and auto-posting PR comments with before/after diffs and downloadable .patch files.",
+      "Strategic Value": "Catches regressions before production deployment, embedding SpeedPilot directly into daily developer workflow."
     },
     {
-      "Milestone": "SP-20",
+      "Milestone": "F-02",
       "Priority": "P0 - Immediate",
-      "Status": "Completed",
-      "Target Audience": "Developers, Marketers, Agencies, SaaS Teams",
-      "Feature Name": "Local GPU Ollama, Red Failure Indicators, Responsive Header & 4-Persona AI Synthesis",
-      "Est. Hours": 2.0,
-      "Key Deliverables": "RTX 3050 local qwen2.5-coder:3b runtime, red indicators on failing/missing Agentic/WebMCP/SEO checks, responsive top header bar, Ponytail skills, and on-demand per-issue/bulk AI synthesis across all 4 personas.",
-      "Strategic Value": "Eliminates misleading UI states and guarantees instant, zero-cost AI code patches & business plans for every issue."
+      "Status": "Planned",
+      "Target Audience": "Digital Agencies, Marketers, WordPress & Shopify Site Owners",
+      "Feature Name": "1-Click CMS & Platform Auto-Sync Engine (WordPress & Shopify)",
+      "Est. Hours": 5.0,
+      "Key Deliverables": "packages/cms-sync with WordPress REST API and Shopify Admin GraphQL connectors; 1-click 'Apply Fix to CMS' for image alts, title/meta tags, and Schema.org JSON-LD; revision history with 1-click rollback.",
+      "Strategic Value": "Eliminates the developer handoff bottleneck for 60%+ of the web by repairing SEO/CWV issues directly in the CMS."
     },
     {
-      "Milestone": "SP-21",
+      "Milestone": "F-03",
       "Priority": "P0 - Immediate",
-      "Status": "Completed",
-      "Target Audience": "Agencies, SaaS Teams & Enterprise Scale",
-      "Feature Name": "AI Signature Cache, Auto-Failover Waterfall, Live /monitoring & White-Label /reports",
-      "Est. Hours": 2.5,
-      "Key Deliverables": "signatureHash DB cache, ordered AUTO AI waterfall (Groq -> Gemini -> Ollama -> DeepSeek -> OpenAI -> Templates), Schedule & Webhook CRUD at /monitoring, Agency White-Label PDF Studio at /reports.",
-      "Strategic Value": "Eliminates redundant GPU/API spend on 200+ URL sitemaps, wires every dashboard route live, and delivers agency-branded client exports."
+      "Status": "Planned",
+      "Target Audience": "SaaS Engineering Teams, Site Reliability Engineers, Agencies",
+      "Feature Name": "Automated Core Web Vitals Budget Enforcement & Incident Alerting",
+      "Est. Hours": 3.5,
+      "Key Deliverables": "Granular budget thresholds per URL/route category (LCP, INP, CLS); real-time alert webhooks (Slack, Discord, PagerDuty); AI root-cause diagnostic explaining exact resource changes.",
+      "Strategic Value": "Alerts teams within minutes of performance degradation instead of waiting for delayed weekly digests."
     },
     {
-      "Milestone": "SP-22",
-      "Priority": "P1 - High",
-      "Status": "Completed",
-      "Target Audience": "Agencies & SaaS Growth Leads",
-      "Feature Name": "Comparisons Studio Upgrade: Trend Charts & Job-vs-Job Diff (/comparisons)",
-      "Est. Hours": 1.5,
-      "Key Deliverables": "Single execution diff, Site-Wide Bulk Job-vs-Job comparison with URL-by-URL ROI table, Before vs After bar chart, and historical Performance timeline.",
-      "Strategic Value": "Proves optimization ROI across entire sites and multiple releases."
-    },
-    {
-      "Milestone": "SP-23",
+      "Milestone": "F-04",
       "Priority": "P0 - Immediate",
-      "Status": "Completed",
-      "Target Audience": "All Users (Accuracy & Beginner Devs)",
-      "Feature Name": "Root .env Loader, Real-Evidence CodeDiffViewer Priority & Simulation Safety",
-      "Est. Hours": 1.5,
-      "Key Deliverables": "Root .env auto-load in next.config.mjs, real AI code snippet priority in CodeDiffViewer, sanitized simulated paths, plain-English dev prompts.",
-      "Strategic Value": "Guarantees live Google PSI data & authentic framework fixes instead of misleading 404 sample assets."
+      "Status": "Planned",
+      "Target Audience": "Headless SPA Developers (Next.js, Nuxt, React, Vite)",
+      "Feature Name": "Hybrid JS-Rendering Headless Crawler",
+      "Est. Hours": 5.5,
+      "Key Deliverables": "Dual-engine crawl architecture: fast HTTP parser as primary, automated Headless Chromium fallback for dynamic client-rendered JavaScript SPAs; DOM link extraction and post-render hydration capture.",
+      "Strategic Value": "Guarantees complete technical SEO visibility across modern single-page applications that render empty HTML shells."
     },
     {
-      "Milestone": "SP-24",
-      "Priority": "P0 - Immediate",
-      "Status": "Completed",
-      "Target Audience": "All Users (Lighthouse 13 & High-Accuracy AI)",
-      "Feature Name": "Lighthouse 13 Dynamic Audits, Sub-Stack Detection, GitHub Context & Free Web AI Pills",
-      "Est. Hours": 2.5,
-      "Key Deliverables": "Dynamic category auditRefs parser, LiteSpeed/WP Rocket/Divi/Cloudflare sub-stack & head hint extraction, 1st/3rd-party URL split, GitHub/pasted code context, and 1-click Ask ChatGPT/Claude/Gemini/Perplexity/Grok/DeepSeek pills.",
-      "Strategic Value": "Raises fix specificity to ~85-90%+ without API costs or manual guesswork."
-    },
-    {
-      "Milestone": "SP-25",
-      "Priority": "P1 - High",
-      "Status": "Completed",
-      "Target Audience": "Developers & DevOps",
-      "Feature Name": "Unattended Worker Cron Runner & Unused CSS/JS/Compression/TTFB Templates",
-      "Est. Hours": 1.5,
-      "Key Deliverables": "60s atomic tickDueSchedules() worker cron loop, worker sub-stack parity, unused-css-rules / unused-javascript / missing-image-alt / TTFB / compression templates.",
-      "Strategic Value": "Enables hands-free scheduled monitoring and eliminates generic fallback snippets across common PSI issues."
-    },
-    {
-      "Milestone": "SP-26",
+      "Milestone": "F-05",
       "Priority": "P1 - High",
       "Status": "Planned",
-      "Target Audience": "Open-Source Maintainers",
-      "Feature Name": "MIT License Switch & Public Self-Hosting README",
-      "Est. Hours": 0.5,
-      "Key Deliverables": "Switch LICENSE & package.json to MIT, document local Ollama + MySQL + Redis setup in README.md.",
-      "Strategic Value": "Prepares repo for clean open-source GitHub release."
+      "Target Audience": "Digital Marketing Agencies & SEO Consultancies",
+      "Feature Name": "White-Label Agency Client Portal & Live Shareable Links",
+      "Est. Hours": 3.5,
+      "Key Deliverables": "Read-only shareable live audit links with HMAC verification; custom agency domain CNAME mapping (e.g., audits.agency.com); custom logo, favicon, brand hex colors, and executive summaries without client login.",
+      "Strategic Value": "Empowers agencies to deliver live branded benchmark portals to clients, driving agency tier upgrades."
     },
     {
-      "Milestone": "SP-27",
-      "Priority": "P2 - Offstream",
-      "Status": "Deferred (Offstream)",
-      "Target Audience": "Hosted Cloud SaaS (speedpilot.webdevwithpritom.com)",
-      "Feature Name": "Cloud Mode Tier Gates & Payment Gateway (Razorpay / Lemon Squeezy)",
-      "Est. Hours": 3.0,
-      "Key Deliverables": "SPEEDPILOT_MODE=CLOUD toggle, DB Subscription gating, checkout & webhook handler.",
-      "Strategic Value": "Monetizes hosted SaaS users while keeping GitHub MIT self-hosting free."
+      "Milestone": "F-06",
+      "Priority": "P1 - High",
+      "Status": "Planned",
+      "Target Audience": "Growth Marketers, CMOs, Competitor Intelligence Analysts",
+      "Feature Name": "Multi-Domain Competitor Radar & Automated ROI Diff Matrix",
+      "Est. Hours": 4.0,
+      "Key Deliverables": "Continuous background monitoring of 3 to 5 rival domains; historical Core Web Vitals gap timeline; automated ROI alert: 'Competitor X improved LCP to 1.8s (+300ms faster than you)'.",
+      "Strategic Value": "Creates executive-level urgency and proves business ROI by directly tracking competitor speed advantages."
+    },
+    {
+      "Milestone": "F-07",
+      "Priority": "P1 - High",
+      "Status": "Planned",
+      "Target Audience": "Frontend Engineers, UI/UX Designers, Performance Specialists",
+      "Feature Name": "Visual DOM Hydration & Cumulative Layout Shift (CLS) Diffing Engine",
+      "Est. Hours": 5.0,
+      "Key Deliverables": "Filmstrip screenshot visualizer showing exact frames where visual layout jumps occur; DOM node highlighting showing before/after dimensions; CSS aspect-ratio and font-display remediation generator.",
+      "Strategic Value": "Solves the most frustrating Google Core Web Vital (CLS) by visually showing developers the exact shifting elements."
+    },
+    {
+      "Milestone": "F-08",
+      "Priority": "P1 - High",
+      "Status": "Planned",
+      "Target Audience": "Enterprise Security Teams, Cloudflare & Edge DevOps",
+      "Feature Name": "Cloudflare / Edge Log Ingestion Gateway",
+      "Est. Hours": 6.0,
+      "Key Deliverables": "Webhook endpoint ingesting edge access logs (Cloudflare Logpush, Fastly, AWS CloudFront); real bot crawler detection (Googlebot, Bingbot, Perplexity, GPTBot); edge cache hit/miss ratio analysis.",
+      "Strategic Value": "Replaces desktop log file analyzers with real-time serverless edge intelligence without storing raw multi-terabyte log files."
+    },
+    {
+      "Milestone": "F-09",
+      "Priority": "P2 - Long Term",
+      "Status": "Planned",
+      "Target Audience": "Autonomous AI Engineering Teams",
+      "Feature Name": "Autonomous Git Branch & PR Remediation App",
+      "Est. Hours": 8.5,
+      "Key Deliverables": "GitHub App OAuth integration; when audits detect asset/CSS/HTML bottlenecks, automatically opens a Git branch, applies AST patches, and submits a ready-to-merge Pull Request with test verification.",
+      "Strategic Value": "Delivers true autonomous self-healing software where performance regressions are patched automatically."
+    },
+    {
+      "Milestone": "F-10",
+      "Priority": "P2 - Long Term",
+      "Status": "Planned",
+      "Target Audience": "High-Traffic SaaS & E-Commerce Web Platforms",
+      "Feature Name": "Synthetic Real-User Monitoring (RUM) Script & Edge Ingestor",
+      "Est. Hours": 7.0,
+      "Key Deliverables": "1.2KB non-blocking web-vitals tracking snippet; high-throughput Edge API endpoint collecting real 75th percentile LCP, INP, and CLS; geographic and device performance segmentation.",
+      "Strategic Value": "Provides continuous, real-time user metrics that update every second rather than waiting for Google's 28-day CrUX window."
     }
   ];
 
