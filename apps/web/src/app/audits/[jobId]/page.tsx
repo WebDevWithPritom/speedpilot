@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Smartphone,
@@ -26,6 +26,8 @@ import {
   Terminal,
   FileText,
   Zap,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { MetricBadge } from "@/components/ui/MetricBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -35,12 +37,14 @@ import { DeepSearchModal } from "@/components/ai/DeepSearchModal";
 
 export default function BulkAuditJobResultsPage() {
   const params = useParams();
+  const router = useRouter();
   const jobId = params?.jobId as string;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [jobData, setJobData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Table filters & sorting
   const [searchQuery, setSearchQuery] = useState("");
@@ -252,6 +256,28 @@ Exported from SpeedPilot SaaS Team Console`;
     showToast("Jira / Linear Sprint Stories copied to clipboard!");
   };
 
+  const handleDeleteAudit = async () => {
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete this audit and all its telemetry data? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/v1/audits/${jobId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete audit");
+      }
+      router.push("/audits");
+    } catch (err: unknown) {
+      alert((err as Error).message || "An error occurred while deleting the audit.");
+      setDeleting(false);
+    }
+  };
+
   const isJobRunning =
     jobData.status === "PROCESSING" || jobData.status === "PENDING" || jobData.status === "QUEUED";
 
@@ -339,6 +365,16 @@ Exported from SpeedPilot SaaS Team Console`;
             >
               {copiedAll ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
               {copiedAll ? "Copied!" : "Copy Data"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDeleteAudit}
+              disabled={deleting}
+              className="px-3 py-1.5 rounded border border-border text-xs font-medium text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/40 transition flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              {deleting ? "Deleting..." : "Delete Audit"}
             </button>
           </div>
         </div>

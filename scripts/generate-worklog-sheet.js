@@ -365,6 +365,18 @@ function createWorkbook() {
       "Deliverables & Code Files": "packages/seo-engine/src/parser.ts, packages/shared/src/types/index.ts, apps/web/src/app/api/v1/seo/inspect/route.ts, apps/web/src/app/seo/SEOClient.tsx, apps/web/src/app/seo/page.tsx",
       "Impact & Technical Notes": "Combined the 3 biggest SEO tools into SpeedPilot: 1) Screaming Frog Spider Mode (Internal/External/Nofollow link equity, Indexability verdict, Heading tree, Image Alt audit, and technical issues rulebook); 2) Semrush Mode (Live Google Desktop & Mobile SERP simulator with 600px pixel width gauge, TF-IDF content keyword density, and on-page score); 3) Ahrefs Mode (0-100 Site Health score, Schema.org rich types validator, OpenGraph social card preview, and side-by-side Competitor Gap Analyzer with real-time SSRF-safe URL inspection).",
       "Developer": "Pritom & Antigravity"
+    },
+    {
+      "Task ID": "SP-31",
+      "Date": "2026-11-13",
+      "Category": "Audit Management & Bug Audit",
+      "Task / Feature Description": "Permanent Audit Deletion with Cascade Cleanup & Optimistic Client UI",
+      "Est. Hours": 1.0,
+      "Actual Hours": 1.0,
+      "Status": "Completed",
+      "Deliverables & Code Files": "apps/web/src/app/api/v1/audits/[jobId]/route.ts, apps/web/src/app/audits/page.tsx, apps/web/src/app/audits/AuditsListClient.tsx, apps/web/src/app/audits/[jobId]/page.tsx",
+      "Impact & Technical Notes": "Implemented secure DELETE /api/v1/audits/[jobId] enforcing tenant workspace isolation with PostgreSQL foreign-key cascade deleting associated executions, lighthouse runs, crux data, and audit issues. Built interactive client AuditsListClient with one-click trash icon, confirmation modal, and optimistic state removal. Added header Delete Audit action in the audit job detail view.",
+      "Developer": "Pritom & Antigravity"
     }
   ];
 

@@ -55,3 +55,34 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ jobId: string }> }
+) {
+  try {
+    const { jobId } = await params;
+    const workspace = await getOrCreateDefaultWorkspace();
+
+    const job = await prisma.auditJob.findFirst({
+      where: { id: jobId, workspaceId: workspace.id },
+    });
+
+    if (!job) {
+      return NextResponse.json({ error: "Audit job not found" }, { status: 404 });
+    }
+
+    // Cascade delete is configured in Prisma schema (AuditExecution, LighthouseResult, CrUXResult, AuditIssue, SEOResult)
+    await prisma.auditJob.delete({
+      where: { id: jobId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Audit job and associated telemetry records deleted successfully",
+    });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+  }
+}
+
+

@@ -13,8 +13,6 @@
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "build:vercel": "npm run db:generate && npm run push:vercel --workspace=@speedpilot/database && npm run build --workspace=@speedpilot/shared --workspace=@speedpilot/security --workspace=@speedpilot/database --workspace=@speedpilot/pagespeed --workspace=@speedpilot/seo-engine --workspace=@speedpilot/ai-engine --workspace=@speedpilot/report-generator && npm run build --workspace=@speedpilot/web",
-    "test": "npm run test --workspaces --if-present",
-    "test:unit": "npm run test:unit --workspaces --if-present",
     "type-check": "npm run type-check --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "db:generate": "npm run generate --workspace=@speedpilot/database",
@@ -23,7 +21,6 @@
   "devDependencies": {
     "basic-ftp": "^6.2.6",
     "ssh2": "^1.17.0",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "typescript": "^5.7.2"
   }
 }
