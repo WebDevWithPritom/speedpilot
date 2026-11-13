@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ExternalLink,
 } from "lucide-react";
+import { RazorpayUpgradeButton } from "@/components/billing/RazorpayUpgradeButton";
 
 export const metadata: Metadata = {
   title: "Pricing & Community Support — SpeedPilot",
@@ -160,12 +161,10 @@ export default function PricingPage() {
               </li>
             </ul>
           </div>
-          <Link
-            href="/signup?redirect=%2Fsettings"
-            className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition text-center"
-          >
-            Upgrade via Settings
-          </Link>
+          <RazorpayUpgradeButton
+            planCode="PRO"
+            label="Upgrade with Razorpay"
+          />
         </div>
       </div>
 

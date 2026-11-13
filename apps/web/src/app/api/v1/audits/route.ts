@@ -7,6 +7,7 @@ import { PageSpeedClient } from "@speedpilot/pagespeed";
 import { crawlAndInspectSEO } from "@speedpilot/seo-engine";
 import { generateAIFixRecommendation, computeIssueSignature } from "@speedpilot/ai-engine";
 import { getOrCreateDefaultWorkspace } from "@/lib/db";
+import { getWorkspaceTier } from "@/lib/subscription";
 
 const psiClient = new PageSpeedClient();
 
@@ -355,7 +356,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const userTier = req.headers.get("x-user-tier") || "FREE";
+    const dbTier = await getWorkspaceTier(workspace.id);
+    const userTier = dbTier !== "FREE" ? dbTier : (req.headers.get("x-user-tier") || "FREE");
     const customGoogleKey = req.headers.get("x-custom-google-key") || undefined;
     const customAiKey = req.headers.get("x-custom-ai-key") || undefined;
     const customAiProvider = req.headers.get("x-custom-ai-provider") || undefined;
