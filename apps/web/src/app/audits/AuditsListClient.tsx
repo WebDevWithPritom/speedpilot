@@ -109,7 +109,13 @@ export function AuditsListClient({ initialJobs }: AuditsListClientProps) {
                 <span>•</span>
                 <span>Device: {job.deviceMode}</span>
                 <span>•</span>
-                <span>Source: {job.source.toLowerCase().replace("_", " ")}</span>
+                {job.source === "CI_CD_PR" ? (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                    <GitPullRequest className="w-3 h-3" /> CI / PR Guard
+                  </span>
+                ) : (
+                  <span>Source: {job.source.toLowerCase().replace("_", " ")}</span>
+                )}
                 <span>•</span>
                 <span suppressHydrationWarning>{new Date(job.createdAt).toLocaleString()}</span>
               </div>

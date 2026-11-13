@@ -3,11 +3,21 @@
 > **Universal Website Performance Intelligence & Optimization Platform**  
 > *"Audit. Understand. Optimize. Improve."*
 
+[![Live Demo](https://img.shields.io/badge/Demo-speedpilot.webdevwithpritom.com-0070f3?style=flat&logo=vercel)](https://speedpilot.webdevwithpritom.com)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/WebDevWithPritom/speedpilot?style=social)](https://github.com/WebDevWithPritom/speedpilot)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)](https://www.postgresql.org/)
-[![BullMQ](https://img.shields.io/badge/BullMQ-Redis-red)](https://bullmq.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-blue)](https://neon.tech/)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Donate-yellow.svg)](https://buymeacoffee.com/webdevwithpritom)
+
+---
+
+## 🌐 Live Application
+
+- **Production URL:** [https://speedpilot.webdevwithpritom.com](https://speedpilot.webdevwithpritom.com)
+- **Instant 1-Click Speed Test:** Test any public URL on the homepage without login.
+- **Creator Support:** [Buy Me a Coffee ($5)](https://buymeacoffee.com/webdevwithpritom)
 
 ---
 
@@ -15,13 +25,14 @@
 
 SpeedPilot transforms raw website performance auditing into an actionable, automated intelligence lifecycle. Unlike basic single-page checkers, SpeedPilot provides:
 
-1. **Bulk Multi-Page Auditing:** Audit 1 or 500+ URLs at once via raw text, CSV upload, or XML sitemap discovery.
-2. **Dual-Lens Data Integrity:** Strict separation of **Lighthouse synthetic lab diagnostics** and **Chrome UX Report (CrUX) 28-day real-user field telemetry** (never confuses TBT with INP or shows fake zeros).
-3. **Independent Technical SEO Crawler:** In-house static HTML engine inspecting metadata, canonicals, robots directives, heading structure, broken links, and structured data without running arbitrary client JavaScript.
-4. **Context-Aware AI Fix Assistant:** Audience-tailored advice (Marketer, Developer, Agency, SaaS Team) with framework-specific fixes for WordPress, WooCommerce, Shopify, Next.js, React, Laravel, or Custom Stacks.
-5. **Cross-Page Issue Intelligence:** Automatically aggregates recurring systemic bottlenecks across entire websites.
-6. **Continuous Monitoring & Regression Detection:** Scheduled recurring audits with change tracking and regression alerts.
-7. **White-Label Client Reports:** Export executive-ready PDF, CSV, and XLSX reports.
+1. **Instant 1-Click Audits:** Benchmark any public website immediately from the hero section (no registration required).
+2. **Bulk Multi-Page Auditing:** Audit single URLs, CSV lists, or auto-discover entire XML sitemaps (500+ URLs) concurrently across Mobile and Desktop.
+3. **Dual-Lens Data Integrity:** Strict separation of **Lighthouse synthetic lab diagnostics** and **Chrome UX Report (CrUX) 28-day real-user field telemetry** (never confuses TBT with INP).
+4. **Independent Technical SEO Crawler:** In-house static HTML engine inspecting metadata, canonicals, robots directives, heading structure, broken links, and structured data with SSRF protection.
+5. **Context-Aware AI Code Fixes:** Framework-specific code diffs for Next.js, React, WordPress, WooCommerce, Shopify, or Laravel with signature caching.
+6. **Multi-Persona Perspective Lens:** View every audit through 4 dedicated lenses: **Developer**, **Marketer**, **Agency**, or **SaaS Team**.
+7. **Monetization & Agency Passes:** Built-in Razorpay checkout supporting Cards, UPI, and Netbanking for Pro passes.
+8. **Executive Deliverables:** Export printer-ready branded HTML/PDF client summaries and CSV datasets.
 
 ---
 
@@ -32,69 +43,74 @@ SpeedPilot is structured as a modular TypeScript monorepo:
 ```
 speedpilot/
 ├── apps/
-│   ├── web/                    # Next.js 15 App Router, UI, REST API
+│   ├── web/                    # Next.js 15 App Router, UI, REST API, Billing
 │   └── worker/                 # Standalone BullMQ background audit worker
 ├── packages/
-│   ├── database/               # Prisma ORM schema & PostgreSQL client
+│   ├── database/               # Prisma ORM schema & Neon PostgreSQL client
 │   ├── shared/                 # Zod validation schemas, TypeScript types, metric constants
 │   ├── security/               # SSRF protection, DNS resolver check, safe-fetch client
 │   ├── pagespeed/              # Google PageSpeed Insights & CrUX API client with rate limiter
 │   ├── seo-engine/             # Safe HTML crawler & Technical SEO evaluator
 │   ├── ai-engine/              # Compact evidence extractor & audience-tailored prompt engine
-│   └── report-generator/       # High-fidelity PDF, Excel (XLSX), and CSV generator
+│   └── report-generator/       # High-fidelity PDF and CSV generator
 ├── docs/                       # Comprehensive documentation & architecture specifications
 └── docker-compose.yml          # Container orchestration for Postgres, Redis, Web, and Worker
 ```
 
 ---
 
-## 🚀 Quickstart (Self-Hosted via Docker)
+## 🚀 Quickstart
 
-### Prerequisites
-- [Docker](https://www.docker.com/) & Docker Compose
-- Node.js v20+ / v24 LTS (for local development)
+### Option 1: Live Cloud App
+Visit [https://speedpilot.webdevwithpritom.com](https://speedpilot.webdevwithpritom.com) to run audits instantly.
 
-### 1. Clone & Configure
+### Option 2: Local Development
 ```bash
+# 1. Clone repository
+git clone https://github.com/WebDevWithPritom/speedpilot.git
+cd speedpilot
+
+# 2. Install dependencies
+npm install
+
+# 3. Configure environment variables
 cp .env.example .env
-# Edit .env and supply your Google PageSpeed and OpenAI keys (optional but recommended)
-```
 
-### 2. Boot Local Infrastructure
-```bash
-docker-compose up -d
-```
+# 4. Generate database client
+npm run db:generate
 
-### 3. Access SpeedPilot
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+# 5. Start dev server
+npm run dev
+```
 
 ---
 
-## 📖 Documentation Directory
+## 🔑 Bring-Your-Own-Key (BYOK)
 
-- [Product Requirements Document (PRD)](docs/PRD.md)
-- [System Architecture](docs/ARCHITECTURE.md)
-- [Database Schema & Data Model](docs/DATABASE.md)
-- [REST API Specification](docs/API.md)
-- [Security & SSRF Mitigation](docs/SECURITY.md)
-- [AI Fix Assistant Architecture](docs/AI-ENGINE.md)
-- [Job Queue & Worker Architecture](docs/JOB-QUEUE.md)
-- [UI/UX Design Specifications](docs/UI-UX.md)
-- [Development Roadmap](docs/DEVELOPMENT-PLAN.md)
-- [Deployment Guide](docs/DEPLOYMENT.md)
-- [Licensing Architecture](docs/LICENSING.md)
-- [Testing Strategy](docs/TESTING.md)
-- [Development Status](DEVELOPMENT-STATUS.md)
+SpeedPilot includes generous free community quotas and allows users to optionally connect their own API keys via the Settings dashboard:
+- **Google PageSpeed Insights & CrUX API:** 25,000 queries/day free tier.
+- **AI Providers Supported:** Google Gemini (1.5 Flash / 2.0), Groq Cloud (Llama 3.3 70B & Qwen Coder), Cerebras, OpenRouter, GitHub Models, SambaNova, NVIDIA NIM, OpenAI, Anthropic, and local Ollama.
 
 ---
 
-## 🛡️ Security
+## 🛡️ Security & Privacy
 
-SpeedPilot takes SSRF, data privacy, and isolation seriously. Read our [Security Policy](SECURITY.md) and [SSRF Architecture](docs/SECURITY.md).
+SpeedPilot takes SSRF, data privacy, and isolation seriously:
+- **SSRF Protection:** All URL crawlers pass through `@speedpilot/security` with DNS resolution guarding against private IPs, loopback, and cloud metadata (`169.254.169.254`).
+- **Timing-Safe Authentication:** Timing-safe comparisons (`crypto.timingSafeEqual`) on admin sessions and webhook HMAC signatures.
+- **Client Key Isolation:** User API keys remain in local browser storage (`localStorage`) and are never written to server logs.
+
+---
+
+## ☕ Support Open Source Development
+
+If SpeedPilot helps your team ship faster websites, consider starring the repo or buying the creator a coffee:
+
+- ⭐ **Star on GitHub:** [WebDevWithPritom/speedpilot](https://github.com/WebDevWithPritom/speedpilot)
+- ☕ **Buy Me a Coffee:** [buymeacoffee.com/webdevwithpritom](https://buymeacoffee.com/webdevwithpritom)
 
 ---
 
 ## 📄 License
 
 SpeedPilot Open-Source Core is licensed under the [Apache License, Version 2.0](LICENSE).
-

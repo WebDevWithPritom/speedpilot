@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { RazorpayUpgradeButton } from "@/components/billing/RazorpayUpgradeButton";
 import {
   ShieldCheck,
   Key,
@@ -742,6 +743,13 @@ export default function SettingsPage() {
                 <span>White-label agency HTML & PDF client reports</span>
               </li>
             </ul>
+
+            <div className="pt-3" onClick={(e) => e.stopPropagation()}>
+              <RazorpayUpgradeButton
+                planCode="PRO"
+                label="Upgrade to Pro with Razorpay (₹2,900 / $29)"
+              />
+            </div>
           </div>
         </div>
       </div>
