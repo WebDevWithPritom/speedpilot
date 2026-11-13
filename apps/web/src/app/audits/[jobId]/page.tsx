@@ -29,6 +29,7 @@ import {
   Trash2,
   Loader2,
   Play,
+  Pause,
 } from "lucide-react";
 import { MetricBadge } from "@/components/ui/MetricBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -61,6 +62,8 @@ export default function BulkAuditJobResultsPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [resuming, setResuming] = useState(false);
   const [resumeProgressMsg, setResumeProgressMsg] = useState<string | null>(null);
+  const autoStartedRef = React.useRef(false);
+  const isCancelledRef = React.useRef(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -81,24 +84,19 @@ export default function BulkAuditJobResultsPage() {
   };
 
   const handleResumeAudit = async (retryTimeouts = true) => {
+    if (resuming) return;
     setResuming(true);
-    setResumeProgressMsg("Initiating batch processing...");
+    isCancelledRef.current = false;
+    setResumeProgressMsg("Auto-starting batch processing...");
     try {
       let isDone = false;
-      let remaining = 1;
-      let totalProcessedSoFar = 0;
+      let consecutiveZeroBatches = 0;
 
-      while (!isDone && remaining > 0) {
-        setResumeProgressMsg(
-          totalProcessedSoFar === 0
-            ? "Processing next batch of URLs..."
-            : `Processing batch (${totalProcessedSoFar} processed, ${remaining} remaining)...`
-        );
-
+      while (!isDone && !isCancelledRef.current) {
         const res = await fetch(`/api/v1/audits/${jobId}/process-batch`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ retryTimeouts: totalProcessedSoFar === 0 ? retryTimeouts : false }),
+          body: JSON.stringify({ retryTimeouts: true }),
         });
 
         if (!res.ok) {
@@ -111,21 +109,38 @@ export default function BulkAuditJobResultsPage() {
 
         await fetchJobStatus();
 
-        if (!batchData || batchData.batchProcessed === 0 || batchData.remainingQueued === 0) {
+        if (!batchData || batchData.isAllFinished || batchData.remainingQueued === 0) {
           isDone = true;
           break;
         }
 
-        totalProcessedSoFar += batchData.batchProcessed;
-        remaining = batchData.remainingQueued;
+        if (batchData.batchProcessed === 0) {
+          consecutiveZeroBatches++;
+          if (consecutiveZeroBatches >= 2) {
+            isDone = true;
+            break;
+          }
+        } else {
+          consecutiveZeroBatches = 0;
+        }
 
-        // Brief delay between batches
-        await new Promise((r) => setTimeout(r, 400));
+        const completed = batchData.totalCompleted || 0;
+        const total = batchData.totalUrls || 1;
+        const remaining = batchData.remainingQueued;
+        setResumeProgressMsg(
+          `⚡ Auto-processing: ${completed} of ${total} completed (${remaining} remaining in background)...`
+        );
+
+        // Brief responsive delay between batches
+        await new Promise((r) => setTimeout(r, 350));
       }
 
-      showToast("Audit batch processing finished!");
+      if (!isCancelledRef.current) {
+        showToast("🎉 All audit executions have completed!");
+      }
     } catch (err: unknown) {
-      alert((err as Error).message || "An error occurred while resuming the audit.");
+      console.error("Auto-resume error:", err);
+      showToast((err as Error).message || "Batch runner encountered an error.");
     } finally {
       setResuming(false);
       setResumeProgressMsg(null);
@@ -145,6 +160,27 @@ export default function BulkAuditJobResultsPage() {
 
     return () => clearInterval(interval);
   }, [jobId, jobData?.status]);
+
+  // Auto-start resume immediately on page load / mount if audit has unfinished/paused URLs
+  useEffect(() => {
+    if (!jobData || loading || autoStartedRef.current || resuming) return;
+
+    const executions = jobData.executions || [];
+    const hasTimedOut = executions.some(
+      (e: any) =>
+        e.status === "FAILED" &&
+        (e.errorMessage?.includes("Timed out") ||
+          e.errorMessage?.includes("serverless") ||
+          e.errorMessage?.includes("Paused"))
+    );
+    const hasQueued = executions.some((e: any) => e.status === "QUEUED");
+    const isUnfinished = jobData.progress && jobData.progress.completed < jobData.progress.total;
+
+    if (isUnfinished && (hasTimedOut || hasQueued)) {
+      autoStartedRef.current = true;
+      handleResumeAudit(true);
+    }
+  }, [jobData, loading, resuming]);
 
   const toggleRow = (executionId: string) => {
     setExpandedRows((prev) => {
@@ -481,17 +517,29 @@ Exported from SpeedPilot SaaS Team Console`;
               {copiedAll ? "Copied!" : "Copy Data"}
             </button>
 
-            {canResume && (
+            {resuming ? (
               <button
                 type="button"
-                onClick={() => handleResumeAudit(hasTimedOutExecutions)}
-                disabled={resuming}
-                className="px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
+                onClick={() => {
+                  isCancelledRef.current = true;
+                  setResuming(false);
+                  showToast("Auto-processing paused.");
+                }}
+                className="px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 text-xs font-semibold transition flex items-center gap-1.5"
               >
-                {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                <span>{resuming ? "Processing..." : "Resume Audit"}</span>
+                <Pause className="w-3.5 h-3.5" />
+                <span>Pause Auto-Run</span>
               </button>
-            )}
+            ) : canResume ? (
+              <button
+                type="button"
+                onClick={() => handleResumeAudit(true)}
+                className="px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 text-xs font-semibold transition flex items-center gap-1.5"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Resume Audit</span>
+              </button>
+            ) : null}
 
             <button
               type="button"
@@ -524,8 +572,34 @@ Exported from SpeedPilot SaaS Team Console`;
           </div>
         </div>
 
-        {/* Actionable Error Guidance if Failures Occurred */}
-        {jobData.progress.failed > 0 && (
+        {/* Active Auto-Batching Runner Banner */}
+        {resuming ? (
+          <div className="p-4 rounded-md border border-primary/30 bg-primary/10 text-primary text-xs space-y-2 animate-pulse">
+            <div className="font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 shrink-0 animate-spin text-primary" />
+                <span className="font-medium text-foreground text-sm">
+                  {resumeProgressMsg || "Auto-Processing Bulk Audit in Background..."}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  isCancelledRef.current = true;
+                  setResuming(false);
+                  showToast("Auto-processing paused.");
+                }}
+                className="px-3.5 py-1.5 rounded border border-border bg-background hover:bg-secondary text-foreground font-semibold text-xs transition flex items-center gap-1.5 shadow-xs shrink-0"
+              >
+                <Pause className="w-3.5 h-3.5" />
+                <span>Pause Auto-Run</span>
+              </button>
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              ⚡ Running micro-batches safely within serverless limits. Progress updates live automatically until 100% complete.
+            </div>
+          </div>
+        ) : jobData.progress.failed > 0 && (
           <div className="p-4 rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs space-y-2">
             <div className="font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
@@ -540,11 +614,10 @@ Exported from SpeedPilot SaaS Team Console`;
                 <button
                   type="button"
                   onClick={() => handleResumeAudit(true)}
-                  disabled={resuming}
-                  className="px-3.5 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center gap-1.5 shadow-xs disabled:opacity-50 shrink-0"
+                  className="px-3.5 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center gap-1.5 shadow-xs shrink-0"
                 >
-                  {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                  <span>{resuming ? (resumeProgressMsg || "Processing...") : "Resume Audit (Process Remaining URLs)"}</span>
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Resume Audit (Auto-Process Remaining URLs)</span>
                 </button>
               )}
             </div>

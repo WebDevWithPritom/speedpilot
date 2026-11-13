@@ -30,11 +30,20 @@ export async function GET(
       return NextResponse.json({ error: "Audit job not found" }, { status: 404 });
     }
 
-    // Watchdog: detect and auto-recover serverless timeout drops (>90s with pending executions)
+    // Watchdog: detect and auto-recover serverless timeout drops (>90s with pending executions and no activity)
+    const completedTimestamps = job.executions
+      .filter((e) => e.completedAt)
+      .map((e) => new Date(e.completedAt!).getTime());
+    const latestExecutionCompletedAt = completedTimestamps.length > 0 ? Math.max(...completedTimestamps) : 0;
+    const lastActivityTime = Math.max(
+      job.startedAt ? new Date(job.startedAt).getTime() : 0,
+      latestExecutionCompletedAt
+    );
+
     const isStale =
       (job.status === "PROCESSING" || job.status === "QUEUED") &&
-      job.startedAt &&
-      Date.now() - new Date(job.startedAt).getTime() > 90_000;
+      lastActivityTime > 0 &&
+      Date.now() - lastActivityTime > 90_000;
 
     if (isStale) {
       const pending = job.executions.filter(

@@ -23,7 +23,6 @@ import {
   Star,
   Github,
   Heart,
-  Coffee,
   ChevronDown,
   HelpCircle,
 } from "lucide-react";
@@ -238,15 +237,13 @@ export function LandingPage() {
                 <span>Star on GitHub</span>
                 <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               </a>
-              <a
-                href="https://buymeacoffee.com/webdevwithpritom"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm font-semibold hover:bg-amber-500/20 transition"
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-border bg-card text-sm font-semibold hover:bg-secondary transition"
               >
-                <Coffee className="w-4 h-4" />
-                <span>Support Developer</span>
-              </a>
+                <Zap className="w-4 h-4 text-primary" />
+                <span>Pricing &amp; Plans</span>
+              </Link>
             </div>
           </div>
 
@@ -540,8 +537,8 @@ export function LandingPage() {
               Free community tier. Optional creator support.
             </h2>
             <p className="text-sm text-muted-foreground">
-              SpeedPilot is free for individuals and teams. Support ongoing development or buy the
-              creator a coffee to keep high-speed servers humming.
+              SpeedPilot is free for individuals and teams. Support ongoing development or upgrade
+              to unlock verified high-speed pipelines and agency features.
             </p>
           </div>
 
@@ -586,11 +583,11 @@ export function LandingPage() {
               </div>
               <div className="space-y-3 pt-1">
                 <div className="text-xs font-semibold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                  <Coffee className="w-3.5 h-3.5" />
-                  <span>Buy Me a Coffee</span>
+                  <Heart className="w-3.5 h-3.5 fill-current" />
+                  <span>Supporter Pass</span>
                 </div>
                 <div className="text-3xl font-extrabold font-mono">
-                  $5 <span className="text-xs font-normal text-muted-foreground">one-time</span>
+                  ₹499 <span className="text-xs font-normal text-muted-foreground">one-time</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Fuel open-source engineering, cloud bandwidth, and high-speed API endpoints.
@@ -605,20 +602,18 @@ export function LandingPage() {
                     <span>Priority feature requests on GitHub</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Coffee className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span>Warm gratitude &amp; good karma</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>Direct Razorpay checkout (Cards, UPI)</span>
                   </li>
                 </ul>
               </div>
-              <a
-                href="https://buymeacoffee.com/webdevwithpritom"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/pricing"
                 className="w-full py-2.5 rounded-xl bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition text-center flex items-center justify-center gap-1.5"
               >
-                <Coffee className="w-3.5 h-3.5" />
-                <span>Buy a Coffee ($5)</span>
-              </a>
+                <Zap className="w-3.5 h-3.5" />
+                <span>Get Supporter Pass</span>
+              </Link>
             </div>
 
             {/* GitHub Star & Community */}
@@ -689,15 +684,10 @@ export function LandingPage() {
               <span>GitHub</span>
               <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
             </a>
-            <a
-              href="https://buymeacoffee.com/webdevwithpritom"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-foreground transition text-amber-600 dark:text-amber-400"
-            >
-              <Coffee className="w-3.5 h-3.5" />
-              <span>Buy a Coffee</span>
-            </a>
+            <Link href="/pricing" className="flex items-center gap-1 hover:text-foreground transition text-primary">
+              <Zap className="w-3.5 h-3.5" />
+              <span>Pricing</span>
+            </Link>
             <Link href="/login" className="hover:text-foreground transition">
               Sign In
             </Link>

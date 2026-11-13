@@ -425,6 +425,18 @@ function createWorkbook() {
       "Deliverables & Code Files": "packages/seo-engine/src/serp-tracker.ts, apps/web/src/app/api/v1/seo/rank/route.ts, apps/web/src/app/seo/SEOClient.tsx, packages/shared/src/types/index.ts",
       "Impact & Technical Notes": "Eliminated costly $50/mo DataForSEO API subscriptions. Scratch-built live multi-engine Google search parser with custom headers and optional free Google Custom Search JSON API fallback. Displays target domain rank (#1, #4, >50), live Top 10 competitor table with 1-click Screaming Frog Spider inspection, Google People Also Ask (PAA) question accordion, and AI rank climbing action plan.",
       "Developer": "Pritom & Antigravity"
+    },
+    {
+      "Task ID": "SP-36",
+      "Date": "2026-11-13",
+      "Category": "Serverless Scaling & Reliability",
+      "Task / Feature Description": "Auto-Resuming Bulk Runner with Continuous Serverless Micro-Batch Pumping",
+      "Est. Hours": 1.0,
+      "Actual Hours": 1.0,
+      "Status": "Completed",
+      "Deliverables & Code Files": "apps/web/src/app/audits/[jobId]/page.tsx, apps/web/src/app/api/v1/audits/[jobId]/process-batch/route.ts, apps/web/src/app/api/v1/audits/[jobId]/route.ts",
+      "Impact & Technical Notes": "Eliminated repetitive manual clicking to finish large audits. Built automatic auto-resume trigger on mount when paused executions are detected, refined watchdog to check latest execution timestamp and prevent premature timeout reassignment, and added live auto-processing banner with Pause/Resume controls.",
+      "Developer": "Pritom & Antigravity"
     }
   ];
 
@@ -531,9 +543,9 @@ function createWorkbook() {
       "Priority": "P0 - Offline Setup",
       "Status": "Planned (Offline Tomorrow)",
       "Target Audience": "Commercial SaaS Billing & Community Supporters",
-      "Feature Name": "Production Payment Activation (Buy Me a Coffee Link & Razorpay Live Keys)",
+      "Feature Name": "Production Payment Gateway Activation (Razorpay Live Keys & Webhook Secret)",
       "Est. Hours": 0.5,
-      "Key Deliverables": "Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and custom Buy Me a Coffee creator URL into Vercel production environment variables and verify checkout.",
+      "Key Deliverables": "Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and RAZORPAY_WEBHOOK_SECRET into Vercel production environment variables and verify checkout.",
       "Strategic Value": "Activates live payment processing and supporter donations safely without exposing secrets on stream."
     },
     {

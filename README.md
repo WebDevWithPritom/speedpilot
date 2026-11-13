@@ -9,7 +9,6 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-blue)](https://neon.tech/)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Donate-yellow.svg)](https://buymeacoffee.com/webdevwithpritom)
 
 ---
 
@@ -17,7 +16,7 @@
 
 - **Production URL:** [https://speedpilot.webdevwithpritom.com](https://speedpilot.webdevwithpritom.com)
 - **Instant 1-Click Speed Test:** Test any public URL on the homepage without login.
-- **Creator Support:** [Buy Me a Coffee ($5)](https://buymeacoffee.com/webdevwithpritom)
+- **Pricing & Pro Passes:** [View Pricing & Plans](https://speedpilot.webdevwithpritom.com/pricing)
 
 ---
 
@@ -102,12 +101,12 @@ SpeedPilot takes SSRF, data privacy, and isolation seriously:
 
 ---
 
-## ☕ Support Open Source Development
+## ⭐ Star & Support
 
-If SpeedPilot helps your team ship faster websites, consider starring the repo or buying the creator a coffee:
+If SpeedPilot helps your team ship faster websites, consider starring the repo:
 
 - ⭐ **Star on GitHub:** [WebDevWithPritom/speedpilot](https://github.com/WebDevWithPritom/speedpilot)
-- ☕ **Buy Me a Coffee:** [buymeacoffee.com/webdevwithpritom](https://buymeacoffee.com/webdevwithpritom)
+- 🚀 **Pro & Agency Passes:** [speedpilot.webdevwithpritom.com/pricing](https://speedpilot.webdevwithpritom.com/pricing)
 
 ---
 

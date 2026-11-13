@@ -4,7 +4,6 @@ import {
   Zap,
   CheckCircle2,
   Heart,
-  Coffee,
   Sparkles,
   ShieldCheck,
   Star,
@@ -15,9 +14,9 @@ import {
 import { RazorpayUpgradeButton } from "@/components/billing/RazorpayUpgradeButton";
 
 export const metadata: Metadata = {
-  title: "Pricing & Community Support — SpeedPilot",
+  title: "Pricing & Plans — SpeedPilot",
   description:
-    "SpeedPilot plans: free community workspace, creator passes, and community supporter tiers.",
+    "SpeedPilot plans: free community workspace, supporter passes, and agency tiers.",
 };
 
 export default function PricingPage() {
@@ -33,8 +32,7 @@ export default function PricingPage() {
           Simple pricing. Support open source.
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Use the full open-source community edition for free, or support development through a
-          supporter pass or coffee.
+          Use the full open-source community edition for free, or unlock priority speed pipelines with a supporter or agency pass.
         </p>
       </div>
 
@@ -80,19 +78,19 @@ export default function PricingPage() {
           </Link>
         </div>
 
-        {/* Tier 2: Community Supporter / Buy Me a Coffee */}
+        {/* Tier 2: Community Supporter Pass */}
         <div className="p-6 rounded-xl border-2 border-amber-500/40 bg-card shadow-lg flex flex-col justify-between space-y-6 relative">
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-black uppercase tracking-wider shadow-sm">
-            Community Supporter
+            Supporter
           </div>
           <div className="space-y-4 pt-1">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                <Coffee className="w-3.5 h-3.5" />
-                <span>Buy Me a Coffee / Supporter</span>
+                <Heart className="w-3.5 h-3.5 fill-current" />
+                <span>Community Supporter Pass</span>
               </div>
-              <div className="text-3xl font-extrabold font-mono mt-1">$5 <span className="text-sm font-normal text-muted-foreground">one-time</span></div>
-              <div className="text-xs text-muted-foreground mt-0.5">Direct creator contribution</div>
+              <div className="text-3xl font-extrabold font-mono mt-1">₹499 <span className="text-sm font-normal text-muted-foreground">one-time</span></div>
+              <div className="text-xs text-muted-foreground mt-0.5">Direct project contribution</div>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Support server costs, independent open-source development, and speed intelligence research.
@@ -112,20 +110,15 @@ export default function PricingPage() {
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>Our eternal gratitude</span>
+                <span>Instant Razorpay checkout (Cards, UPI, Netbanking)</span>
               </li>
             </ul>
           </div>
-          <a
-            href="https://buymeacoffee.com"
-            target="_blank"
-            rel="noopener noreferrer"
+          <RazorpayUpgradeButton
+            planCode="STARTER"
+            label="Get Supporter Pass (₹499)"
             className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
-          >
-            <Coffee className="w-3.5 h-3.5" />
-            <span>Support via Buy Me a Coffee</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
+          />
         </div>
 
         {/* Tier 3: Pro Pass */}

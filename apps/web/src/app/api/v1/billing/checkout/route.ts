@@ -5,10 +5,10 @@ import { getOrCreateDefaultWorkspace } from "@/lib/db";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const plan = body.planCode === "AGENCY" ? "AGENCY" : "PRO";
+    const plan = body.planCode === "AGENCY" ? "AGENCY" : body.planCode === "STARTER" ? "STARTER" : "PRO";
     
-    // Amount in paise (INR 2,900 for Pro, INR 7,900 for Agency)
-    const amount = plan === "AGENCY" ? 790000 : 290000;
+    // Amount in paise (INR 499 for Starter, INR 2,900 for Pro, INR 7,900 for Agency)
+    const amount = plan === "AGENCY" ? 790000 : plan === "STARTER" ? 49900 : 290000;
 
     const workspace = await getOrCreateDefaultWorkspace();
 
