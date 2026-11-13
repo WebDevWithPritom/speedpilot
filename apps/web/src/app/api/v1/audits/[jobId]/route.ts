@@ -46,7 +46,7 @@ export async function GET(
           where: { id: { in: pending.map((e) => e.id) } },
           data: {
             status: "FAILED",
-            errorMessage: "Timed out by serverless host (60s limit). Split larger audits into smaller batches.",
+            errorMessage: "Paused by serverless host (60s limit). Click 'Resume Audit' to process remaining URLs.",
           },
         });
 
@@ -66,7 +66,7 @@ export async function GET(
         job.failedUrls = newFailed;
         pending.forEach((p) => {
           p.status = "FAILED";
-          p.errorMessage = "Timed out by serverless host (60s limit).";
+          p.errorMessage = "Paused by serverless host (60s limit). Click 'Resume Audit' to process remaining URLs.";
         });
       }
     }

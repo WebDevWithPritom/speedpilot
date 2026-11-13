@@ -28,6 +28,7 @@ import {
   Zap,
   Trash2,
   Loader2,
+  Play,
 } from "lucide-react";
 import { MetricBadge } from "@/components/ui/MetricBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -58,6 +59,8 @@ export default function BulkAuditJobResultsPage() {
   // Global Audience Persona
   const { persona, setPersona, personaConfig } = usePersona();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [resuming, setResuming] = useState(false);
+  const [resumeProgressMsg, setResumeProgressMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -74,6 +77,59 @@ export default function BulkAuditJobResultsPage() {
     } catch (err: unknown) {
       setError((err as Error).message);
       setLoading(false);
+    }
+  };
+
+  const handleResumeAudit = async (retryTimeouts = true) => {
+    setResuming(true);
+    setResumeProgressMsg("Initiating batch processing...");
+    try {
+      let isDone = false;
+      let remaining = 1;
+      let totalProcessedSoFar = 0;
+
+      while (!isDone && remaining > 0) {
+        setResumeProgressMsg(
+          totalProcessedSoFar === 0
+            ? "Processing next batch of URLs..."
+            : `Processing batch (${totalProcessedSoFar} processed, ${remaining} remaining)...`
+        );
+
+        const res = await fetch(`/api/v1/audits/${jobId}/process-batch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ retryTimeouts: totalProcessedSoFar === 0 ? retryTimeouts : false }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to process batch");
+        }
+
+        const resJson = await res.json();
+        const batchData = resJson.data;
+
+        await fetchJobStatus();
+
+        if (!batchData || batchData.batchProcessed === 0 || batchData.remainingQueued === 0) {
+          isDone = true;
+          break;
+        }
+
+        totalProcessedSoFar += batchData.batchProcessed;
+        remaining = batchData.remainingQueued;
+
+        // Brief delay between batches
+        await new Promise((r) => setTimeout(r, 400));
+      }
+
+      showToast("Audit batch processing finished!");
+    } catch (err: unknown) {
+      alert((err as Error).message || "An error occurred while resuming the audit.");
+    } finally {
+      setResuming(false);
+      setResumeProgressMsg(null);
+      fetchJobStatus();
     }
   };
 
@@ -121,6 +177,13 @@ export default function BulkAuditJobResultsPage() {
   }
 
   const executions = jobData.executions || [];
+  const hasTimedOutExecutions = executions.some(
+    (e: any) =>
+      e.status === "FAILED" &&
+      (e.errorMessage?.includes("Timed out") || e.errorMessage?.includes("serverless") || e.errorMessage?.includes("Paused"))
+  );
+  const hasQueuedExecutions = executions.some((e: any) => e.status === "QUEUED");
+  const canResume = hasTimedOutExecutions || hasQueuedExecutions;
 
   // Filter & Sort
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -418,6 +481,18 @@ Exported from SpeedPilot SaaS Team Console`;
               {copiedAll ? "Copied!" : "Copy Data"}
             </button>
 
+            {canResume && (
+              <button
+                type="button"
+                onClick={() => handleResumeAudit(hasTimedOutExecutions)}
+                disabled={resuming}
+                className="px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                <span>{resuming ? "Processing..." : "Resume Audit"}</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleDeleteAudit}
@@ -451,14 +526,36 @@ Exported from SpeedPilot SaaS Team Console`;
 
         {/* Actionable Error Guidance if Failures Occurred */}
         {jobData.progress.failed > 0 && (
-          <div className="p-4 rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs space-y-1.5">
-            <div className="font-semibold flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              Audit Execution Encountered an External API Constraint
+          <div className="p-4 rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs space-y-2">
+            <div className="font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>
+                  {hasTimedOutExecutions
+                    ? "Audit Batch Paused by Serverless Host (60s Execution Limit)"
+                    : "Audit Execution Encountered an External API Constraint"}
+                </span>
+              </div>
+              {hasTimedOutExecutions && (
+                <button
+                  type="button"
+                  onClick={() => handleResumeAudit(true)}
+                  disabled={resuming}
+                  className="px-3.5 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center gap-1.5 shadow-xs disabled:opacity-50 shrink-0"
+                >
+                  {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                  <span>{resuming ? (resumeProgressMsg || "Processing...") : "Resume Audit (Process Remaining URLs)"}</span>
+                </button>
+              )}
             </div>
             <p className="text-muted-foreground">
               {filteredExecutions.find((e: any) => e.errorMessage)?.errorMessage || "An error occurred during audit execution."}
             </p>
+            {hasTimedOutExecutions && (
+              <div className="pt-2 text-[11px] text-foreground border-t border-amber-500/20">
+                💡 <strong>Serverless Safe Auto-Batching:</strong> On serverless hosts (like Vercel), massive audits with 50+ or 500+ URLs are paused at the 60s execution limit to prevent data loss. Clicking <strong>Resume Audit</strong> processes the remaining URLs in continuous background chunks without re-running completed pages.
+              </div>
+            )}
             {filteredExecutions.some((e: any) => e.errorMessage?.includes("429")) && (
               <div className="pt-2 text-[11px] text-foreground border-t border-amber-500/20">
                 <strong>Why this happens:</strong> Google limits anonymous/unauthenticated PageSpeed Insights requests per IP address.
