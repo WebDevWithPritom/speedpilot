@@ -27,6 +27,8 @@ export async function GET(req: NextRequest) {
 
   const token = await signAdminSession();
   const res = NextResponse.redirect(new URL("/admin/users", req.url));
+  res.headers.set("Referrer-Policy", "no-referrer");
+  res.headers.set("Cache-Control", "no-store, private, max-age=0");
   attachAdminCookie(res, token);
   return res;
 }

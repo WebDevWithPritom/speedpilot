@@ -30,6 +30,47 @@ export async function GET(
       return NextResponse.json({ error: "Audit job not found" }, { status: 404 });
     }
 
+    // Watchdog: detect and auto-recover serverless timeout drops (>90s with pending executions)
+    const isStale =
+      (job.status === "PROCESSING" || job.status === "QUEUED") &&
+      job.startedAt &&
+      Date.now() - new Date(job.startedAt).getTime() > 90_000;
+
+    if (isStale) {
+      const pending = job.executions.filter(
+        (e) => e.status === "QUEUED" || e.status === "AUDITING" || e.status === "FETCHING"
+      );
+
+      if (pending.length > 0) {
+        await prisma.auditExecution.updateMany({
+          where: { id: { in: pending.map((e) => e.id) } },
+          data: {
+            status: "FAILED",
+            errorMessage: "Timed out by serverless host (60s limit). Split larger audits into smaller batches.",
+          },
+        });
+
+        const newFailed = job.failedUrls + pending.length;
+        const newStatus = job.completedUrls > 0 ? "PARTIAL_FAILURE" : "FAILED";
+
+        await prisma.auditJob.update({
+          where: { id: job.id },
+          data: {
+            failedUrls: newFailed,
+            status: newStatus,
+            completedAt: new Date(),
+          },
+        });
+
+        job.status = newStatus;
+        job.failedUrls = newFailed;
+        pending.forEach((p) => {
+          p.status = "FAILED";
+          p.errorMessage = "Timed out by serverless host (60s limit).";
+        });
+      }
+    }
+
     const progressPercentage =
       job.totalUrls > 0 ? Math.round(((job.completedUrls + job.failedUrls) / job.totalUrls) * 100) : 0;
 

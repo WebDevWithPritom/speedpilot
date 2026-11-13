@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { History, Zap, ArrowRight, Trash2, Loader2 } from "lucide-react";
+import { History, Zap, ArrowRight, Trash2, Loader2, GitPullRequest } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { MetricBadge } from "@/components/ui/MetricBadge";
 
