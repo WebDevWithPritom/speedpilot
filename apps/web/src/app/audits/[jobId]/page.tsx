@@ -266,22 +266,68 @@ export default function BulkAuditJobResultsPage() {
 
       {/* Results Table */}
       <div className="border border-border rounded-lg overflow-hidden bg-card shadow-sm">
+        {/* Metric Explanation Legend for Marketers & Developers */}
+        <div className="px-4 py-2.5 bg-secondary/30 border-b border-border flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-foreground">Score Legend:</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> 90–100 Good</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500"></span> 50–89 Needs Work</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500"></span> 0–49 Poor</span>
+          </div>
+          <div className="text-[11px] italic">
+            * Lab scores are simulated synthetic tests; Field metrics (CrUX) reflect genuine real-user experience over 28 days.
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-secondary/40 text-muted-foreground border-b border-border font-medium">
               <tr>
                 <th className="py-3 px-4 w-8"></th>
-                <th className="py-3 px-4">URL</th>
-                <th className="py-3 px-3 text-center">Device</th>
-                <th className="py-3 px-3 text-center">Perf</th>
-                <th className="py-3 px-3 text-center">A11y</th>
-                <th className="py-3 px-3 text-center">Best</th>
-                <th className="py-3 px-3 text-center">SEO</th>
-                <th className="py-3 px-3 text-right">LCP (Lab)</th>
-                <th className="py-3 px-3 text-right">CLS</th>
-                <th className="py-3 px-3 text-center">INP (Field)</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3 px-4">
+                  <div className="font-semibold text-foreground">Target URL</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Page Destination</div>
+                </th>
+                <th className="py-3 px-3 text-center">
+                  <div className="font-semibold text-foreground">Device</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Strategy</div>
+                </th>
+                <th className="py-3 px-3 text-center" title="Lighthouse Performance Score (0-100) — Synthetic benchmark of overall loading speed and page rendering.">
+                  <div className="font-semibold text-foreground">Performance</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Page Speed</div>
+                </th>
+                <th className="py-3 px-3 text-center" title="Accessibility Score (0-100) — Usability for screen readers, color contrast, keyboard navigation, and ARIA semantics.">
+                  <div className="font-semibold text-foreground">Accessibility</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">UX & Contrast</div>
+                </th>
+                <th className="py-3 px-3 text-center" title="Best Practices Score (0-100) — Modern web standards, HTTPS security, modern image formats, and clean console logging.">
+                  <div className="font-semibold text-foreground">Best Practices</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Code Hygiene</div>
+                </th>
+                <th className="py-3 px-3 text-center" title="SEO Health Score (0-100) — Search engine readiness: title tags, meta descriptions, canonical URLs, and indexability.">
+                  <div className="font-semibold text-foreground">SEO Health</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Rankability</div>
+                </th>
+                <th className="py-3 px-3 text-right" title="Largest Contentful Paint (Lab) — Time taken for the main visual content of the page to fully load. Ideal: ≤ 2.5s.">
+                  <div className="font-semibold text-foreground">LCP (Load)</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Main Content</div>
+                </th>
+                <th className="py-3 px-3 text-right" title="Cumulative Layout Shift — Visual stability measuring unexpected layout jumps during page load. Ideal: ≤ 0.1.">
+                  <div className="font-semibold text-foreground">CLS (Shift)</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Visual Stability</div>
+                </th>
+                <th className="py-3 px-3 text-center" title="Interaction to Next Paint (CrUX Field) — Real Chrome user interaction latency (click/tap response delay). Ideal: ≤ 200ms.">
+                  <div className="font-semibold text-foreground">INP (Response)</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Real User Field</div>
+                </th>
+                <th className="py-3 px-4 text-center">
+                  <div className="font-semibold text-foreground">Status</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Execution</div>
+                </th>
+                <th className="py-3 px-4 text-right">
+                  <div className="font-semibold text-foreground">Actions</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">AI Fixes</div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -405,31 +451,53 @@ export default function BulkAuditJobResultsPage() {
                                 </p>
                               </div>
                             ) : (
-                              <div className="space-y-2">
+                              <div className="space-y-3">
                                 <div className="flex items-center justify-between text-xs">
                                   <span className="font-semibold text-foreground flex items-center gap-1.5">
                                     <Sparkles className="w-3.5 h-3.5 text-primary" />
-                                    Diagnostic Opportunities & AI Suggestions
+                                    Executive Insights & Diagnostics Overview
                                   </span>
                                   <Link
                                     href={`/audits/executions/${ex.id}`}
-                                    className="text-primary hover:underline text-[11px] font-medium"
+                                    className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-semibold"
                                   >
                                     View Full Analysis & AI Code Diffs →
                                   </Link>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5 text-xs">
                                   <div className="p-2.5 rounded border border-border bg-card">
-                                    <div className="text-muted-foreground text-[11px]">Total Blocking Time (TBT)</div>
-                                    <div className="font-mono font-bold text-sm mt-0.5">{formatMs(lh?.tbtMs)}</div>
-                                  </div>
-                                  <div className="p-2.5 rounded border border-border bg-card">
-                                    <div className="text-muted-foreground text-[11px]">First Contentful Paint (FCP)</div>
+                                    <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+                                      First Paint (FCP)
+                                    </div>
                                     <div className="font-mono font-bold text-sm mt-0.5">{formatMs(lh?.fcpMs)}</div>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">When first content appears</p>
                                   </div>
+
                                   <div className="p-2.5 rounded border border-border bg-card">
-                                    <div className="text-muted-foreground text-[11px]">Identified Issues</div>
-                                    <div className="font-mono font-bold text-sm mt-0.5">{ex._count?.issues ?? 0} found</div>
+                                    <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+                                      Main Load (LCP)
+                                    </div>
+                                    <div className="font-mono font-bold text-sm mt-0.5">{formatMs(lh?.lcpMs)}</div>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">When main banner/hero loads</p>
+                                  </div>
+
+                                  <div className="p-2.5 rounded border border-border bg-card">
+                                    <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+                                      Blocking Time (TBT)
+                                    </div>
+                                    <div className="font-mono font-bold text-sm mt-0.5">{formatMs(lh?.tbtMs)}</div>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">Main thread JS delays</p>
+                                  </div>
+
+                                  <div className="p-2.5 rounded border border-border bg-card">
+                                    <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+                                      Identified Bottlenecks
+                                    </div>
+                                    <div className="font-mono font-bold text-sm mt-0.5 text-primary">
+                                      {ex._count?.issues ?? 0} Opportunities
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">Ready for AI remediation</p>
                                   </div>
                                 </div>
                               </div>
