@@ -75,6 +75,7 @@ export function AuditsListClient({ initialJobs }: AuditsListClientProps) {
         </p>
         <Link
           href="/audits/new"
+          prefetch={true}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition"
         >
           <Zap className="w-3.5 h-3.5" />
@@ -130,6 +131,7 @@ export function AuditsListClient({ initialJobs }: AuditsListClientProps) {
 
               <Link
                 href={`/audits/${job.id}`}
+                prefetch={true}
                 className="px-3.5 py-1.5 rounded-md border border-border text-xs font-semibold hover:bg-secondary transition flex items-center gap-1"
               >
                 View Details <ArrowRight className="w-3.5 h-3.5" />

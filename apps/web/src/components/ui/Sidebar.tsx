@@ -102,6 +102,7 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
+              prefetch={true}
               title={collapsed ? item.name : undefined}
               aria-label={item.name}
               className={`flex items-center rounded-md text-sm font-medium transition-colors ${
