@@ -29,11 +29,9 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try { if (localStorage.getItem("sp_theme") === "dark") { document.documentElement.classList.add("dark"); } else { document.documentElement.classList.remove("dark"); } } catch (e) { console.warn("Failed to load theme preference:", e); }`,
-          }}
-        />
+        <script>
+          {`try { if (localStorage.getItem("sp_theme") === "dark") { document.documentElement.classList.add("dark"); } else { document.documentElement.classList.remove("dark"); } } catch (e) { console.warn("Failed to load theme preference:", e); }`}
+        </script>
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans min-h-screen bg-background text-foreground flex antialiased`}>
         <AppShell isAuthenticated={Boolean(user)} initialUser={user}>{children}</AppShell>
