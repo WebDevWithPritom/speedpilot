@@ -87,7 +87,11 @@ export default function BulkAuditJobResultsPage() {
     if (resuming) return;
     setResuming(true);
     isCancelledRef.current = false;
-    setResumeProgressMsg("Auto-starting batch processing...");
+    const initialCompleted = jobData?.progress?.completed || 0;
+    const initialTotal = jobData?.progress?.total || 1;
+    setResumeProgressMsg(
+      `⚡ Auto-processing bulk audit (${initialCompleted} of ${initialTotal} completed)...`
+    );
     try {
       let isDone = false;
       let consecutiveZeroBatches = 0;
@@ -109,7 +113,19 @@ export default function BulkAuditJobResultsPage() {
 
         await fetchJobStatus();
 
-        if (!batchData || batchData.isAllFinished || batchData.remainingQueued === 0) {
+        if (!batchData) {
+          isDone = true;
+          break;
+        }
+
+        const completed = batchData.totalCompleted || 0;
+        const total = batchData.totalUrls || 1;
+        const remaining = batchData.remainingQueued;
+        setResumeProgressMsg(
+          `⚡ Auto-processing: ${completed} of ${total} completed (${remaining} remaining in background)...`
+        );
+
+        if (batchData.isAllFinished || remaining === 0) {
           isDone = true;
           break;
         }
@@ -124,15 +140,8 @@ export default function BulkAuditJobResultsPage() {
           consecutiveZeroBatches = 0;
         }
 
-        const completed = batchData.totalCompleted || 0;
-        const total = batchData.totalUrls || 1;
-        const remaining = batchData.remainingQueued;
-        setResumeProgressMsg(
-          `⚡ Auto-processing: ${completed} of ${total} completed (${remaining} remaining in background)...`
-        );
-
-        // Brief responsive delay between batches
-        await new Promise((r) => setTimeout(r, 350));
+        // Fast micro-delay between rapid batches
+        await new Promise((r) => setTimeout(r, 200));
       }
 
       if (!isCancelledRef.current) {
@@ -151,15 +160,15 @@ export default function BulkAuditJobResultsPage() {
   useEffect(() => {
     fetchJobStatus();
 
-    // Auto-poll while job is active
+    // Auto-poll while job is active or resuming
     const interval = setInterval(() => {
-      if (jobData && (jobData.status === "PROCESSING" || jobData.status === "PENDING" || jobData.status === "QUEUED")) {
+      if (resuming || (jobData && (jobData.status === "PROCESSING" || jobData.status === "PENDING" || jobData.status === "QUEUED"))) {
         fetchJobStatus();
       }
-    }, 3000);
+    }, 2000);
 
     return () => clearInterval(interval);
-  }, [jobId, jobData?.status]);
+  }, [jobId, jobData?.status, resuming]);
 
   // Auto-start resume immediately on page load / mount if audit has unfinished URLs
   useEffect(() => {
