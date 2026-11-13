@@ -55,3 +55,4 @@ describe("SSRF Protection - IP Validation", () => {
     await expect(validateHostAgainstSSRF("10.0.0.5")).rejects.toThrow(SecurityError);
   });
 });
+

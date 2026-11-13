@@ -145,3 +145,4 @@ export async function validateHostAgainstSSRF(hostname: string): Promise<string[
     throw new SecurityError(`DNS lookup failed for '${trimmed}': ${(err as Error).message}`, "DNS_LOOKUP_ERROR");
   }
 }
+

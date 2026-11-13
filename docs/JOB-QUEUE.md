@@ -99,3 +99,4 @@ const jobOptions = {
 1. **Idempotent Executions:** Each job references a unique `executionId` in PostgreSQL. When a worker starts, it checks if `status === 'PROCESSING'` or `'COMPLETED'` to prevent double audits during worker restarts.
 2. **Job Cancellation:** Users can cancel an in-flight batch audit from the UI. The API updates `AuditJob.status = 'CANCELLED'`. Workers poll the job state or receive a Redis cancellation signal before initiating heavy external API calls.
 3. **Graceful Worker Shutdown:** Workers listen for `SIGTERM` and `SIGINT`, finishing active in-flight audits before closing Redis connections.
+

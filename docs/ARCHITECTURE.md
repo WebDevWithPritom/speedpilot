@@ -167,3 +167,4 @@ sequenceDiagram
 - Raw Lighthouse output can exceed 400KB of JSON per page.
 - SpeedPilot extracts only critical opportunities, failing audits, and technical SEO errors into a normalized, compact JSON evidence schema (< 5KB).
 - Reusable audit patterns are keyed by signature hash to avoid redundant LLM invocations for identical third-party library issues across hundreds of project URLs.
+

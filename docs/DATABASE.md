@@ -282,3 +282,4 @@ Outbound event notification endpoints.
 - `events` (JSON, array of subscribed event types)
 - `isActive` (Boolean, default true)
 - `createdAt` (DateTime)
+

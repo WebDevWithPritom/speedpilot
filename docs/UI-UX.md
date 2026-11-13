@@ -76,3 +76,4 @@ The central workhorse interface is the Bulk Audit Results Table:
 - **Keyboard Navigation:** Full tab-order navigation across all tables, modal dialogues, and action dropdowns.
 - **Color Contrast:** Minimum 4.5:1 text-to-background contrast ratio across both Light and Dark modes.
 - **Screen Reader Support:** All metric charts include hidden `aria-label` descriptions explaining data points.
+

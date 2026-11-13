@@ -32,3 +32,4 @@ We will acknowledge receipt within 48 hours and work with you to patch the issue
 - Stream size limits (5MB) and redirect hop caps (5).
 - Zero server-side JavaScript execution during crawls.
 - Workspace data isolation enforced at the database query level.
+

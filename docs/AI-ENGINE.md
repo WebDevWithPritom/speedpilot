@@ -116,3 +116,4 @@ export const AIRecommendationSchema = z.object({
 1. **Signature Caching:** An SHA-256 hash is computed from `auditCode + techStack + normalizedOffendingAsset`. If an identical issue (e.g. standard Google Analytics render-blocking pattern) has already been solved in the workspace, the cached recommendation is returned immediately without LLM invocation.
 2. **AI Provider Abstraction:** While OpenAI (`gpt-4o-mini` for fast high-volume recommendations, `gpt-4o` for deep audits) is the default, the interface allows plugging in Google Gemini, Anthropic, or local Ollama models.
 3. **Execution Safety Policy:** SpeedPilot strictly provides recommendations and code diffs. Under no circumstances does the application automatically execute or deploy AI code onto customer production servers.
+

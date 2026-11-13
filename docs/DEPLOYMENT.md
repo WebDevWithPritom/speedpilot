@@ -133,3 +133,4 @@ volumes:
 1. **Database Migrations:** Run `npx prisma migrate deploy` in the database package prior to booting web/worker containers.
 2. **Reverse Proxy & SSL:** Configure Nginx or Cloudflare with TLS 1.3 termination, HTTP/2 or HTTP/3, and standard security headers (`Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`).
 3. **Backup Strategy:** Nightly automated `pg_dump` snapshots to an offsite S3-compatible bucket.
+

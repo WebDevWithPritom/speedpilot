@@ -40,3 +40,4 @@ Commercial offerings provide convenience and managed infrastructure for agencies
 - White-label report branding (upload agency logo, custom color palette, remove SpeedPilot marks).
 - Managed high-concurrency cloud worker pool eliminating Google API quota hurdles.
 - Subscription billing integration (Stripe and localized payment gateways).
+

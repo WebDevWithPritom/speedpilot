@@ -52,3 +52,4 @@ npm run dev
 3. Run the test suite: `npm test`.
 4. Commit with conventional commit messages (e.g. `feat: add Shopify theme font display detector`).
 5. Open a Pull Request with a clear description of the problem solved.
+

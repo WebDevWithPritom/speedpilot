@@ -75,3 +75,4 @@ export function classifyOverallScore(score: number): MetricCategory {
   if (score >= 50) return "NEEDS_IMPROVEMENT";
   return "POOR";
 }
+

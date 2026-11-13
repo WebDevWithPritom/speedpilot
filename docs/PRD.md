@@ -173,3 +173,4 @@ While standard tools (such as Google PageSpeed Insights web UI) offer single-pag
 - Absolute adherence to data integrity: no synthetic or fabricated scores.
 - Clear distinction between lab measurements (Lighthouse) and field telemetry (CrUX).
 - Full user ownership and exportability of all project data.
+

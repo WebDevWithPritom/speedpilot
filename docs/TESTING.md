@@ -58,3 +58,4 @@ speedpilot/
 
 ### 3.3 End-to-End Verification (`npm run test:e2e`)
 - Playwright drives headless Chromium through full user workflows.
+

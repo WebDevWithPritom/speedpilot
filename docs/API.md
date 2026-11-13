@@ -267,3 +267,4 @@ Trigger document export.
 }
 ```
 - **Response 200 OK:** Streams PDF binary or returns pre-signed download URL.
+

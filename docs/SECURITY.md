@@ -97,3 +97,4 @@ To prevent DNS rebinding attacks where an attacker's DNS nameserver alters its r
 - All sensitive keys (`GOOGLE_PAGESPEED_API_KEY`, `GOOGLE_CRUX_API_KEY`, `OPENAI_API_KEY`, `DATABASE_URL`, `REDIS_URL`, `SESSION_SECRET`) are loaded exclusively from environment variables.
 - Secrets are never committed to version control.
 - Logs and error stack traces automatically sanitize and redact authorization headers, tokens, and sensitive URL query parameters.
+

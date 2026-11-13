@@ -1,0 +1,19 @@
+{
+  "name": "@speedpilot/ai-engine",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@speedpilot/shared": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

@@ -107,3 +107,4 @@ export interface AIRecommendationOutput {
   estimatedDifficulty: "EASY" | "MEDIUM" | "HARD";
   estimatedImpact: "LOW" | "MEDIUM" | "HIGH";
 }
+

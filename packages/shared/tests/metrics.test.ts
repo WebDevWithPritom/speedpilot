@@ -44,3 +44,4 @@ describe("Core Web Vitals Threshold Classifiers", () => {
     expect(classifyOverallScore(12)).toBe("POOR");
   });
 });
+

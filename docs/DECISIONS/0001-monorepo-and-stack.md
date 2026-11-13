@@ -47,3 +47,4 @@ We need a project structure and technology stack that:
 - High architectural cleanliness with strict boundaries.
 - Ability to deploy the web application and worker processes independently or together via `docker-compose.yml`.
 - Type changes in shared schemas immediately propagate across API route handlers and background jobs.
+

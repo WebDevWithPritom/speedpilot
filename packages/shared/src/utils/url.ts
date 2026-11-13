@@ -103,3 +103,4 @@ export function extractDomain(url: string): string | null {
     return null;
   }
 }
+

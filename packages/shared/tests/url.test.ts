@@ -54,3 +54,4 @@ describe("URL Utilities & Normalization", () => {
     expect(extractDomain("invalid-url")).toBeNull();
   });
 });
+

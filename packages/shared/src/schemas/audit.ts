@@ -35,3 +35,4 @@ export const SitemapImportSchema = z.object({
   sitemapUrl: z.string().url("Valid sitemap URL is required"),
   maxUrls: z.number().int().min(1).max(500).default(50),
 });
+
