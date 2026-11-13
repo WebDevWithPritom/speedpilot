@@ -20,11 +20,23 @@ export function parseGooglePSIResponse(raw: any, targetUrl: string, device: Sing
   const audits = lhr.audits || {};
 
   // 1. Extract Lighthouse Scores (0 - 100)
+  const agenticCat = categories["agentic-browsing"];
+  const agenticScore = agenticCat?.score != null ? Math.round(agenticCat.score * 100) : null;
+  let agenticRatio: string | null = null;
+  if (agenticCat?.auditRefs && Array.isArray(agenticCat.auditRefs)) {
+    const total = agenticCat.auditRefs.length;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const passed = agenticCat.auditRefs.filter((ref: any) => audits[ref.id]?.score === 1).length;
+    agenticRatio = `${passed}/${total}`;
+  }
+
   const scores: LighthouseScorecard = {
     performance: Math.round((categories.performance?.score ?? 0) * 100),
     accessibility: Math.round((categories.accessibility?.score ?? 0) * 100),
     bestPractices: Math.round((categories["best-practices"]?.score ?? 0) * 100),
     seo: Math.round((categories.seo?.score ?? 0) * 100),
+    agenticBrowsing: agenticScore,
+    agenticRatio,
   };
 
   // 2. Extract Synthetic Lab Metrics
@@ -98,6 +110,12 @@ export function parseGooglePSIResponse(raw: any, targetUrl: string, device: Sing
     { id: "dom-size", cat: "PERFORMANCE" as const },
     { id: "total-byte-weight", cat: "PERFORMANCE" as const },
     { id: "redirects", cat: "PERFORMANCE" as const },
+    { id: "agent-accessibility-tree", cat: "ACCESSIBILITY" as const },
+    { id: "webmcp-form-coverage", cat: "BEST_PRACTICES" as const },
+    { id: "webmcp-registered-tools", cat: "BEST_PRACTICES" as const },
+    { id: "webmcp-schema-validity", cat: "BEST_PRACTICES" as const },
+    { id: "llms-txt", cat: "SEO" as const },
+    { id: "ard-schema", cat: "BEST_PRACTICES" as const },
   ];
 
   for (const item of significantAudits) {
@@ -121,16 +139,39 @@ export function parseGooglePSIResponse(raw: any, targetUrl: string, device: Sing
       }
 
       // Extract specific offending items
-      const evidenceItems: Array<{ url?: string; wastedMs?: number; wastedBytes?: number; description?: string }> = [];
+      const evidenceItems: Array<{
+        url?: string;
+        wastedMs?: number;
+        wastedBytes?: number;
+        description?: string;
+        selector?: string;
+        snippet?: string;
+        nodeLabel?: string;
+      }> = [];
       const detailsItems = audit.details?.items;
       if (Array.isArray(detailsItems)) {
         for (const detail of detailsItems.slice(0, 10)) {
-          evidenceItems.push({
-            url: detail.url,
-            wastedMs: detail.wastedMs != null ? Math.round(detail.wastedMs) : undefined,
-            wastedBytes: detail.wastedBytes != null ? Math.round(detail.wastedBytes) : undefined,
-            description: detail.description,
-          });
+          // Handle nested list-section items (used by Agentic Browsing & accessibility trees)
+          if (detail.value?.items && Array.isArray(detail.value.items)) {
+            for (const subItem of detail.value.items.slice(0, 15)) {
+              evidenceItems.push({
+                description: subItem.description || "Agent accessibility failure",
+                selector: subItem.node?.selector,
+                snippet: subItem.node?.snippet,
+                nodeLabel: subItem.node?.nodeLabel,
+              });
+            }
+          } else {
+            evidenceItems.push({
+              url: detail.url,
+              wastedMs: detail.wastedMs != null ? Math.round(detail.wastedMs) : undefined,
+              wastedBytes: detail.wastedBytes != null ? Math.round(detail.wastedBytes) : undefined,
+              description: detail.description,
+              selector: detail.node?.selector,
+              snippet: detail.node?.snippet,
+              nodeLabel: detail.node?.nodeLabel,
+            });
+          }
         }
       }
 

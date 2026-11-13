@@ -46,6 +46,7 @@ export class PageSpeedClient {
     endpoint.searchParams.append("category", "accessibility");
     endpoint.searchParams.append("category", "best-practices");
     endpoint.searchParams.append("category", "seo");
+    endpoint.searchParams.append("category", "agentic-browsing");
 
     if (this.apiKey) {
       endpoint.searchParams.set("key", this.apiKey);

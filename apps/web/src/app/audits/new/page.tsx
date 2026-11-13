@@ -265,10 +265,19 @@ export default function NewAuditPage() {
         targetProjectId = projData.data.id;
       }
 
-      // 3. Trigger audit
+      // 3. Trigger audit (forward BYOK keys from local storage if available)
+      const customGoogleKey = typeof window !== "undefined" ? localStorage.getItem("sp_google_key") || "" : "";
+      const customAiKey = typeof window !== "undefined" ? localStorage.getItem("sp_ai_key") || "" : "";
+      const customAiProvider = typeof window !== "undefined" ? localStorage.getItem("sp_ai_provider") || "" : "";
+
       const auditRes = await fetch("/api/v1/audits", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(customGoogleKey ? { "x-custom-google-key": customGoogleKey } : {}),
+          ...(customAiKey ? { "x-custom-ai-key": customAiKey } : {}),
+          ...(customAiProvider ? { "x-custom-ai-provider": customAiProvider } : {}),
+        },
         body: JSON.stringify({
           projectId: targetProjectId,
           deviceMode,
@@ -278,6 +287,11 @@ export default function NewAuditPage() {
 
       const auditData = await auditRes.json();
       if (!auditRes.ok) {
+        if (auditData.code === "TIER_LIMIT_REACHED") {
+          throw new Error(
+            `${auditData.error} You can configure your free Google API key anytime in Settings.`
+          );
+        }
         throw new Error(auditData.error || "Failed to trigger audit job");
       }
 

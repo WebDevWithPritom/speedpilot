@@ -11,13 +11,14 @@ export interface AIRecommendationRequest {
   techStack: TechStack;
   issue: NormalizedAuditIssue;
   apiKey?: string;
+  provider?: "OPENAI" | "GEMINI" | "ANTHROPIC" | "AUTO";
   model?: string;
 }
 
 export interface GeneratedRecommendationResult {
   signature: string;
   recommendation: AIRecommendationOutput;
-  source: "OPENAI" | "DETERMINISTIC_TEMPLATE";
+  source: "OPENAI" | "GEMINI" | "ANTHROPIC" | "DETERMINISTIC_TEMPLATE";
   promptTokens?: number;
   completionTokens?: number;
 }
@@ -32,11 +33,21 @@ export async function generateAIFixRecommendation(
   const wastedMs = req.issue.evidenceItems[0]?.wastedMs;
   const signature = computeIssueSignature(req.issue.code, req.techStack, primaryResource);
 
-  const apiKey = req.apiKey || process.env.OPENAI_API_KEY;
-  const model = req.model || process.env.AI_MODEL || "gpt-4o-mini";
+  let apiKey = req.apiKey || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_PAGESPEED_API_KEY;
+  let provider = req.provider || "AUTO";
 
-  // If no OpenAI key is configured, immediately return deterministic templates
-  if (!apiKey) {
+  if (provider === "AUTO") {
+    if (apiKey?.startsWith("AIzaSy")) {
+      provider = "GEMINI";
+    } else if (apiKey?.startsWith("sk-ant-")) {
+      provider = "ANTHROPIC";
+    } else if (apiKey?.startsWith("sk-")) {
+      provider = "OPENAI";
+    }
+  }
+
+  // If no API key is configured or provider unresolved, immediately return deterministic templates
+  if (!apiKey || (provider !== "GEMINI" && provider !== "OPENAI" && provider !== "ANTHROPIC")) {
     const templateOutput = getDeterministicRecommendation(
       req.issue.code,
       req.techStack,
@@ -87,58 +98,121 @@ Do NOT invent plugins, themes, or file paths that are unsupported by the evidenc
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20_000);
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Audit Evidence:\n${JSON.stringify(evidencePayload, null, 2)}` },
-        ],
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-      }),
-      signal: controller.signal,
-    });
+    let parsed: AIRecommendationOutput;
+    let promptTokens = 0;
+    let completionTokens = 0;
 
-    clearTimeout(timeoutId);
+    if (provider === "GEMINI") {
+      const geminiModel = req.model || process.env.GEMINI_MODEL || "gemini-1.5-flash";
+      const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
 
-    if (!response.ok) {
-      throw new Error(`OpenAI API returned HTTP ${response.status}: ${response.statusText}`);
+      const res = await fetch(geminiEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: `${systemPrompt}\n\nAudit Evidence:\n${JSON.stringify(evidencePayload, null, 2)}` }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.2,
+          }
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`Gemini API HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const gData = await res.json();
+      const rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) throw new Error("Empty candidate from Gemini");
+      parsed = JSON.parse(rawText) as AIRecommendationOutput;
+      promptTokens = gData.usageMetadata?.promptTokenCount || 0;
+      completionTokens = gData.usageMetadata?.candidatesTokenCount || 0;
+
+      return {
+        signature,
+        recommendation: {
+          detectedStack: parsed.detectedStack || req.techStack,
+          explanationMarketer: parsed.explanationMarketer,
+          explanationDeveloper: parsed.explanationDeveloper,
+          explanationAgency: parsed.explanationAgency,
+          explanationSaaSTeam: parsed.explanationSaaSTeam,
+          remediationCodeSnippet: parsed.remediationCodeSnippet,
+          implementationSteps: parsed.implementationSteps || [],
+          verificationSteps: parsed.verificationSteps || [],
+          estimatedDifficulty: parsed.estimatedDifficulty || "MEDIUM",
+          estimatedImpact: parsed.estimatedImpact || "HIGH",
+        },
+        source: "GEMINI",
+        promptTokens,
+        completionTokens,
+      };
+    } else {
+      // OpenAI / compatible
+      const model = req.model || process.env.AI_MODEL || "gpt-4o-mini";
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Audit Evidence:\n${JSON.stringify(evidencePayload, null, 2)}` },
+          ],
+          temperature: 0.2,
+          response_format: { type: "json_object" },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API returned HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const rawContent = data.choices?.[0]?.message?.content;
+      if (!rawContent) {
+        throw new Error("Empty completion from OpenAI");
+      }
+
+      parsed = JSON.parse(rawContent) as AIRecommendationOutput;
+
+      return {
+        signature,
+        recommendation: {
+          detectedStack: parsed.detectedStack || req.techStack,
+          explanationMarketer: parsed.explanationMarketer,
+          explanationDeveloper: parsed.explanationDeveloper,
+          explanationAgency: parsed.explanationAgency,
+          explanationSaaSTeam: parsed.explanationSaaSTeam,
+          remediationCodeSnippet: parsed.remediationCodeSnippet,
+          implementationSteps: parsed.implementationSteps || [],
+          verificationSteps: parsed.verificationSteps || [],
+          estimatedDifficulty: parsed.estimatedDifficulty || "MEDIUM",
+          estimatedImpact: parsed.estimatedImpact || "HIGH",
+        },
+        source: "OPENAI",
+        promptTokens: data.usage?.prompt_tokens,
+        completionTokens: data.usage?.completion_tokens,
+      };
     }
-
-    const data = await response.json();
-    const rawContent = data.choices?.[0]?.message?.content;
-    if (!rawContent) {
-      throw new Error("Empty completion from OpenAI");
-    }
-
-    const parsed = JSON.parse(rawContent) as AIRecommendationOutput;
-
-    return {
-      signature,
-      recommendation: {
-        detectedStack: parsed.detectedStack || req.techStack,
-        explanationMarketer: parsed.explanationMarketer,
-        explanationDeveloper: parsed.explanationDeveloper,
-        explanationAgency: parsed.explanationAgency,
-        explanationSaaSTeam: parsed.explanationSaaSTeam,
-        remediationCodeSnippet: parsed.remediationCodeSnippet,
-        implementationSteps: parsed.implementationSteps || [],
-        verificationSteps: parsed.verificationSteps || [],
-        estimatedDifficulty: parsed.estimatedDifficulty || "MEDIUM",
-        estimatedImpact: parsed.estimatedImpact || "HIGH",
-      },
-      source: "OPENAI",
-      promptTokens: data.usage?.prompt_tokens,
-      completionTokens: data.usage?.completion_tokens,
-    };
   } catch {
-    // Graceful fallback to deterministic template if OpenAI fails or times out
+    // Graceful fallback to deterministic template if AI fails or times out
     const fallbackOutput = getDeterministicRecommendation(
       req.issue.code,
       req.techStack,

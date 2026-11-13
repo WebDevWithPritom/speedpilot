@@ -40,6 +40,8 @@ export interface LighthouseScorecard {
   accessibility: number;
   bestPractices: number;
   seo: number;
+  agenticBrowsing?: number | null; // 0 - 100 (Google Agentic Browsing & WebMCP Readiness)
+  agenticRatio?: string | null; // e.g. "1/2" or "2/2"
 }
 
 export interface LighthouseLabMetrics {
@@ -92,6 +94,9 @@ export interface NormalizedAuditIssue {
     wastedMs?: number;
     wastedBytes?: number;
     description?: string;
+    selector?: string;
+    snippet?: string;
+    nodeLabel?: string;
   }>;
 }
 

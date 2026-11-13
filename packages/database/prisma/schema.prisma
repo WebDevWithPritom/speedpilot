@@ -1,10 +1,11 @@
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.1.x", "debian-openssl-1.1.x"]
 }
 
 // ==========================================
@@ -132,8 +133,8 @@ model Domain {
 model ProjectURL {
   id             String           @id @default(uuid())
   projectId      String
-  url            String
-  normalizedUrl  String
+  url            String           @db.VarChar(2048)
+  normalizedUrl  String           @db.VarChar(500)
   label          String?
   isActive       Boolean          @default(true)
   project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -158,7 +159,7 @@ model AuditJob {
   totalUrls     Int              @default(0)
   completedUrls Int              @default(0)
   failedUrls    Int              @default(0)
-  errorMessage  String?
+  errorMessage  String?          @db.Text
   startedAt     DateTime?
   completedAt   DateTime?
   project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -174,11 +175,11 @@ model AuditExecution {
   id              String               @id @default(uuid())
   auditJobId      String
   projectUrlId    String
-  url             String
+  url             String               @db.VarChar(2048)
   device          String               // MOBILE, DESKTOP
   status          String               @default("QUEUED") // QUEUED, FETCHING, AUDITING, ANALYZING_AI, COMPLETED, FAILED, CANCELLED
   retryCount      Int                  @default(0)
-  errorMessage    String?
+  errorMessage    String?              @db.Text
   executionTimeMs Int?
   auditJob        AuditJob             @relation(fields: [auditJobId], references: [id], onDelete: Cascade)
   projectUrl      ProjectURL           @relation(fields: [projectUrlId], references: [id], onDelete: Cascade)
@@ -204,12 +205,14 @@ model LighthouseResult {
   accessibilityScore Float
   bestPracticesScore Float
   seoScore           Float
+  agenticScore       Float?
+  agenticRatio       String?
   fcpMs              Float
   lcpMs              Float
   tbtMs              Float
   cls                Float
   speedIndexMs       Float
-  rawJsonStoragePath String?
+  rawJsonStoragePath String?        @db.Text
   auditExecution     AuditExecution @relation(fields: [auditExecutionId], references: [id], onDelete: Cascade)
   createdAt          DateTime       @default(now())
 }
@@ -236,13 +239,13 @@ model SEOResult {
   isHttps               Boolean
   pageTitle             String?
   titleLength           Int?
-  metaDescription       String?
+  metaDescription       String?        @db.Text
   descriptionLength     Int?
-  canonicalUrl          String?
+  canonicalUrl          String?        @db.VarChar(2048)
   isCanonicalMatch      Boolean        @default(true)
-  robotsDirectives      String?
+  robotsDirectives      String?        @db.Text
   h1Count               Int            @default(0)
-  h1Text                String?
+  h1Text                String?        @db.Text
   hasBrokenInternalLinks Boolean       @default(false)
   brokenLinksCount      Int            @default(0)
   missingAltImagesCount Int            @default(0)
@@ -262,7 +265,7 @@ model IssueGroup {
   code            String
   title           String
   severity        String             // LOW, MEDIUM, HIGH, CRITICAL
-  sharedResource  String?
+  sharedResource  String?            @db.Text
   affectedUrlCount Int               @default(1)
   project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues          AuditIssue[]
@@ -281,7 +284,7 @@ model AuditIssue {
   title            String
   category         String            // PERFORMANCE, ACCESSIBILITY, BEST_PRACTICES, SEO, TECHNICAL_SEO
   severity         String            // LOW, MEDIUM, HIGH, CRITICAL
-  displayValue     String?
+  displayValue     String?           @db.Text
   evidenceDetails  Json?
   auditExecution   AuditExecution    @relation(fields: [auditExecutionId], references: [id], onDelete: Cascade)
   issueGroup       IssueGroup?       @relation(fields: [issueGroupId], references: [id])
@@ -297,11 +300,11 @@ model AIRecommendation {
   auditIssueId           String?
   issueGroupId           String?     @unique
   detectedStack          String      @default("UNKNOWN")
-  explanationMarketer    String
-  explanationDeveloper   String
-  explanationAgency      String
-  explanationSaaSTeam    String
-  remediationCodeSnippet String?
+  explanationMarketer    String      @db.Text
+  explanationDeveloper   String      @db.Text
+  explanationAgency      String      @db.Text
+  explanationSaaSTeam    String      @db.Text
+  remediationCodeSnippet String?     @db.Text
   implementationSteps    Json
   verificationSteps      Json
   estimatedDifficulty    String      @default("MEDIUM")
@@ -341,7 +344,7 @@ model Report {
   projectId      String
   title          String
   format         String   // "PDF", "CSV", "XLSX"
-  fileUrl        String?
+  fileUrl        String?  @db.Text
   isWhiteLabel   Boolean  @default(false)
   project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
@@ -366,7 +369,7 @@ model APIKey {
 model Webhook {
   id          String    @id @default(uuid())
   workspaceId String
-  url         String
+  url         String    @db.VarChar(2048)
   secret      String
   events      Json      // Array of event names
   isActive    Boolean   @default(true)

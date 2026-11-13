@@ -8,7 +8,17 @@ import { generateAIFixRecommendation } from "@speedpilot/ai-engine";
 const psiClient = new PageSpeedClient();
 
 // In-process runner function that processes an execution without blocking HTTP response
-async function executeAuditAsync(executionId: string, jobId: string, url: string, device: "MOBILE" | "DESKTOP") {
+async function executeAuditAsync(
+  executionId: string,
+  jobId: string,
+  url: string,
+  device: "MOBILE" | "DESKTOP",
+  customKeys?: {
+    googleKey?: string;
+    aiKey?: string;
+    aiProvider?: string;
+  }
+) {
   const startTime = Date.now();
   try {
     await prisma.auditExecution.update({
@@ -16,7 +26,11 @@ async function executeAuditAsync(executionId: string, jobId: string, url: string
       data: { status: "AUDITING" },
     });
 
-    const psiResult = await psiClient.runAudit(url, device);
+    const activeClient = customKeys?.googleKey
+      ? new PageSpeedClient({ apiKey: customKeys.googleKey })
+      : psiClient;
+
+    const psiResult = await activeClient.runAudit(url, device);
 
     let seoInspection = null;
     let detectedStack: TechStack = "UNKNOWN";
@@ -41,6 +55,8 @@ async function executeAuditAsync(executionId: string, jobId: string, url: string
         accessibilityScore: psiResult.scores.accessibility,
         bestPracticesScore: psiResult.scores.bestPractices,
         seoScore: psiResult.scores.seo,
+        agenticScore: psiResult.scores.agenticBrowsing ?? null,
+        agenticRatio: psiResult.scores.agenticRatio ?? null,
         fcpMs: psiResult.labMetrics.fcpMs,
         lcpMs: psiResult.labMetrics.lcpMs,
         tbtMs: psiResult.labMetrics.tbtMs,
@@ -147,6 +163,8 @@ async function executeAuditAsync(executionId: string, jobId: string, url: string
               score: 0.5,
               evidenceItems: issue.evidenceDetails,
             },
+            apiKey: customKeys?.aiKey,
+            provider: (customKeys?.aiProvider as any) || "AUTO",
           });
 
           await prisma.aIRecommendation.create({
@@ -288,8 +306,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const userTier = req.headers.get("x-user-tier") || "FREE";
+    const customGoogleKey = req.headers.get("x-custom-google-key") || undefined;
+    const customAiKey = req.headers.get("x-custom-ai-key") || undefined;
+    const customAiProvider = req.headers.get("x-custom-ai-provider") || undefined;
+
     if (normalizedList.length === 0) {
       return NextResponse.json({ error: "No valid URLs provided" }, { status: 400 });
+    }
+
+    // Tier enforcement:
+    // Free community tier is limited to 5 URLs per bulk job unless they bring their own Google API key
+    if (userTier === "FREE" && !customGoogleKey && normalizedList.length > 5) {
+      return NextResponse.json(
+        {
+          error: "Free community tier is limited to 5 URLs per bulk audit to conserve shared API quotas. Add your own free Google PageSpeed API key in Settings or upgrade to Pro for unlimited bulk audits.",
+          code: "TIER_LIMIT_REACHED",
+          upgradeRequired: true,
+          limit: 5,
+          requested: normalizedList.length,
+        },
+        { status: 403 }
+      );
     }
 
     const devicesToRun: Array<"MOBILE" | "DESKTOP"> =
@@ -357,7 +395,17 @@ export async function POST(req: NextRequest) {
           const currentTask = executionTasks[taskIndex++];
           if (!currentTask) break;
           try {
-            await executeAuditAsync(currentTask.executionId, auditJob.id, currentTask.url, currentTask.device);
+            await executeAuditAsync(
+              currentTask.executionId,
+              auditJob.id,
+              currentTask.url,
+              currentTask.device,
+              {
+                googleKey: customGoogleKey,
+                aiKey: customAiKey,
+                aiProvider: customAiProvider,
+              }
+            );
           } catch (e) {
             console.error(`Audit error for ${currentTask.url}:`, e);
           }

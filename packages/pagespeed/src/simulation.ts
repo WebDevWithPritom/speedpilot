@@ -280,6 +280,35 @@ export function generateDryRunSimulation(url: string, device: SingleDevice): Par
     });
   }
 
+  // Agentic Browsing simulation
+  const agenticPassed = seedA % 3 === 0 ? 2 : 1;
+  const agenticBrowsing = agenticPassed === 2 ? 100 : 50;
+  const agenticRatio = `${agenticPassed}/2`;
+
+  if (agenticPassed === 1) {
+    selectedIssues.push({
+      code: "agent-accessibility-tree",
+      title: "Accessibility tree is not well-formed",
+      category: "ACCESSIBILITY",
+      severity: "MEDIUM",
+      displayValue: "Failing accessibility elements for AI agents",
+      score: 0.5,
+      evidenceItems: [
+        {
+          description: "Links must have discernible text",
+          selector: "div.row > div.col-md-12 > div.logo > a",
+          snippet: `<a href="${domain}">`,
+        },
+        {
+          description: "Select element must have an accessible name",
+          nodeLabel: "中文 Deutsch English",
+          selector: "div.footer > div.lang-select > select.pll-dropdown",
+          snippet: `<select class="pll-dropdown" onchange="if(this.value) window.location.href=this.value;">`,
+        },
+      ],
+    });
+  }
+
   return {
     url,
     device,
@@ -288,6 +317,8 @@ export function generateDryRunSimulation(url: string, device: SingleDevice): Par
       accessibility: accessibilityScore,
       bestPractices: bestPracticesScore,
       seo: seoScore,
+      agenticBrowsing,
+      agenticRatio,
     },
     labMetrics: {
       fcpMs,

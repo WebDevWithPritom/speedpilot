@@ -16,6 +16,8 @@ import {
   Download,
   RotateCw,
   AlertCircle,
+  Copy,
+  Check,
 } from "lucide-react";
 import { MetricBadge } from "@/components/ui/MetricBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -36,6 +38,7 @@ export default function BulkAuditJobResultsPage() {
   const [sortField, setSortField] = useState<string>("score");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [copiedAll, setCopiedAll] = useState(false);
 
   const fetchJobStatus = async () => {
     try {
@@ -176,6 +179,37 @@ export default function BulkAuditJobResultsPage() {
               <Download className="w-3.5 h-3.5" />
               Export CSV
             </button>
+
+            <button
+              onClick={() => {
+                const jsonStr = JSON.stringify(jobData, null, 2);
+                const blob = new Blob([jsonStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", `speedpilot_audit_${jobId.slice(0, 8)}.json`);
+                document.body.appendChild(link);
+                link.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="px-3 py-1.5 rounded border border-border text-xs font-medium hover:bg-secondary transition flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export JSON
+            </button>
+
+            <button
+              onClick={() => {
+                const jsonStr = JSON.stringify(jobData, null, 2);
+                navigator.clipboard.writeText(jsonStr);
+                setCopiedAll(true);
+                setTimeout(() => setCopiedAll(false), 2000);
+              }}
+              className="px-3 py-1.5 rounded border border-border text-xs font-medium hover:bg-secondary transition flex items-center gap-1.5"
+            >
+              {copiedAll ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedAll ? "Copied!" : "Copy Data"}
+            </button>
           </div>
         </div>
 
@@ -287,8 +321,8 @@ export default function BulkAuditJobResultsPage() {
                 <th colSpan={3} className="py-1.5 px-4 text-foreground/80 bg-secondary/30">
                   Target Page & Device
                 </th>
-                <th colSpan={4} className="py-1.5 px-3 text-center text-foreground/80 bg-secondary/50 border-x border-border/60">
-                  Lighthouse Scores (0–100)
+                <th colSpan={5} className="py-1.5 px-3 text-center text-foreground/80 bg-secondary/50 border-x border-border/60">
+                  Lighthouse & Agentic Scores (0–100)
                 </th>
                 <th colSpan={3} className="py-1.5 px-3 text-center text-foreground/80 bg-secondary/30 border-r border-border/60">
                   Core Web Vitals
@@ -297,40 +331,43 @@ export default function BulkAuditJobResultsPage() {
                   Audit State
                 </th>
               </tr>
-              {/* Individual Column Headers (Single Line, No Awkward Wrapping) */}
+              {/* Individual Column Headers (Single Line, Compact & Clean) */}
               <tr className="text-xs">
-                <th className="py-2.5 px-3 w-8"></th>
-                <th className="py-2.5 px-3 whitespace-nowrap font-semibold text-foreground">
-                  Page URL
+                <th className="py-2.5 px-2 w-8"></th>
+                <th className="py-2.5 px-2.5 whitespace-nowrap font-semibold text-foreground">
+                  URL
                 </th>
-                <th className="py-2.5 px-2 text-center whitespace-nowrap font-semibold text-foreground" title="Emulated audit strategy">
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap font-semibold text-foreground" title="Audit Device Strategy">
                   Device
                 </th>
-                <th className="py-2.5 px-2.5 text-center whitespace-nowrap font-semibold text-foreground border-l border-border/40" title="Overall loading speed and rendering performance score (0-100)">
-                  Performance
+                <th className="py-2.5 px-2 text-center whitespace-nowrap font-semibold text-foreground border-l border-border/40" title="Overall loading speed and rendering performance score (0-100)">
+                  Perf
                 </th>
-                <th className="py-2.5 px-2.5 text-center whitespace-nowrap font-semibold text-foreground" title="Screen reader usability, color contrast, and ARIA attributes (0-100)">
-                  Accessibility
+                <th className="py-2.5 px-2 text-center whitespace-nowrap font-semibold text-foreground" title="Screen reader usability, color contrast, and ARIA attributes (0-100)">
+                  A11y
                 </th>
-                <th className="py-2.5 px-2.5 text-center whitespace-nowrap font-semibold text-foreground" title="HTTPS security, modern web standards, and console hygiene (0-100)">
-                  Best Practices
+                <th className="py-2.5 px-2 text-center whitespace-nowrap font-semibold text-foreground" title="HTTPS security, modern web standards, and console hygiene (0-100)">
+                  Best
                 </th>
-                <th className="py-2.5 px-2.5 text-center whitespace-nowrap font-semibold text-foreground border-r border-border/40" title="Technical SEO indexability, meta tags, and structured data (0-100)">
-                  SEO Health
+                <th className="py-2.5 px-2 text-center whitespace-nowrap font-semibold text-foreground" title="Technical SEO indexability, meta tags, and structured data (0-100)">
+                  SEO
                 </th>
-                <th className="py-2.5 px-3 text-right whitespace-nowrap font-semibold text-foreground" title="Largest Contentful Paint: Time until main visual content renders. Good: ≤ 2.5s">
-                  LCP (Load)
+                <th className="py-2.5 px-2 text-center whitespace-nowrap font-semibold text-foreground border-r border-border/40" title="Google Agentic Browsing & WebMCP readiness for AI browsing agents">
+                  Agentic
                 </th>
-                <th className="py-2.5 px-3 text-right whitespace-nowrap font-semibold text-foreground" title="Cumulative Layout Shift: Unexpected visual layout jumps. Good: ≤ 0.1">
-                  CLS (Shift)
+                <th className="py-2.5 px-2.5 text-right whitespace-nowrap font-semibold text-foreground" title="Largest Contentful Paint: Time until main visual content renders. Good: ≤ 2.5s">
+                  LCP
                 </th>
-                <th className="py-2.5 px-3 text-center whitespace-nowrap font-semibold text-foreground border-r border-border/40" title="Interaction to Next Paint: Real Chrome user click/tap latency. Good: ≤ 200ms">
-                  INP (Field)
+                <th className="py-2.5 px-2.5 text-right whitespace-nowrap font-semibold text-foreground" title="Cumulative Layout Shift: Unexpected visual layout jumps. Good: ≤ 0.1">
+                  CLS
                 </th>
-                <th className="py-2.5 px-3 text-center whitespace-nowrap font-semibold text-foreground">
+                <th className="py-2.5 px-2 text-center whitespace-nowrap font-semibold text-foreground border-r border-border/40" title="Interaction to Next Paint: Real Chrome user click/tap latency. Good: ≤ 200ms">
+                  INP
+                </th>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap font-semibold text-foreground">
                   Status
                 </th>
-                <th className="py-2.5 px-4 text-right whitespace-nowrap font-semibold text-foreground">
+                <th className="py-2.5 px-3 text-right whitespace-nowrap font-semibold text-foreground">
                   Actions
                 </th>
               </tr>
@@ -338,7 +375,7 @@ export default function BulkAuditJobResultsPage() {
             <tbody className="divide-y divide-border">
               {filteredExecutions.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={13} className="py-10 text-center text-muted-foreground">
                     No execution results match your search query.
                   </td>
                 </tr>
@@ -351,7 +388,7 @@ export default function BulkAuditJobResultsPage() {
                   return (
                     <React.Fragment key={ex.id}>
                       <tr className="hover:bg-secondary/20 transition-colors">
-                        <td className="py-2.5 px-3">
+                        <td className="py-2 px-2">
                           <button
                             onClick={() => toggleRow(ex.id)}
                             className="p-1 text-muted-foreground hover:text-foreground"
@@ -361,8 +398,8 @@ export default function BulkAuditJobResultsPage() {
                         </td>
 
                         {/* URL with external icon */}
-                        <td className="py-2.5 px-3 font-mono">
-                          <div className="flex items-center gap-1.5 max-w-sm truncate" title={ex.url}>
+                        <td className="py-2 px-2.5 font-mono">
+                          <div className="flex items-center gap-1.5 max-w-xs truncate" title={ex.url}>
                             <span className="truncate">{ex.url}</span>
                             <a
                               href={ex.url}
@@ -376,7 +413,7 @@ export default function BulkAuditJobResultsPage() {
                         </td>
 
                         {/* Device Badge */}
-                        <td className="py-2.5 px-2 text-center">
+                        <td className="py-2 px-1.5 text-center">
                           {ex.device === "MOBILE" ? (
                             <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="Mobile">
                               <Smartphone className="w-3.5 h-3.5" />
@@ -389,45 +426,63 @@ export default function BulkAuditJobResultsPage() {
                         </td>
 
                         {/* Scores */}
-                        <td className="py-2.5 px-2.5 text-center border-l border-border/40">
+                        <td className="py-2 px-2 text-center border-l border-border/40">
                           <MetricBadge score={lh?.performanceScore} size="sm" />
                         </td>
-                        <td className="py-2.5 px-2.5 text-center">
+                        <td className="py-2 px-2 text-center">
                           <MetricBadge score={lh?.accessibilityScore} size="sm" />
                         </td>
-                        <td className="py-2.5 px-2.5 text-center">
+                        <td className="py-2 px-2 text-center">
                           <MetricBadge score={lh?.bestPracticesScore} size="sm" />
                         </td>
-                        <td className="py-2.5 px-2.5 text-center border-r border-border/40">
+                        <td className="py-2 px-2 text-center">
                           <MetricBadge score={lh?.seoScore} size="sm" />
+                        </td>
+                        <td className="py-2 px-2 text-center border-r border-border/40">
+                          {lh?.agenticRatio ? (
+                            <span
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded font-mono font-bold text-[10px] ${
+                                (lh.agenticScore ?? 0) >= 90
+                                  ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30"
+                                  : (lh.agenticScore ?? 0) >= 50
+                                  ? "bg-amber-500/15 text-amber-500 border border-amber-500/30"
+                                  : "bg-rose-500/15 text-rose-500 border border-rose-500/30"
+                              }`}
+                              title={`Agentic Browsing: ${lh.agenticRatio} passed (${lh.agenticScore ?? 0}%)`}
+                            >
+                              {lh.agenticRatio}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground/60">—</span>
+                          )}
                         </td>
 
                         {/* Lab Metrics */}
-                        <td className="py-2.5 px-3 text-right font-mono font-medium">
+                        <td className="py-2 px-2.5 text-right font-mono font-medium">
                           {formatMs(lh?.lcpMs)}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-medium">
+                        <td className="py-2 px-2.5 text-right font-mono font-medium">
                           {lh?.cls != null ? lh.cls.toFixed(3) : "—"}
                         </td>
 
                         {/* INP Field Data */}
-                        <td className="py-2.5 px-3 text-center border-r border-border/40">
+                        <td className="py-2 px-2 text-center border-r border-border/40">
                           {crux?.inpValueMs != null ? (
                             <span className="font-mono text-xs">{crux.inpValueMs}ms</span>
                           ) : (
                             <span className="text-[10px] text-muted-foreground/70 italic" title="CrUX requires minimum 28-day user sessions">
-                              No Field Data
+                              —
                             </span>
                           )}
                         </td>
 
                         {/* Execution Status */}
-                        <td className="py-2.5 px-3 text-center">
+                        <td className="py-2 px-2 text-center">
                           <StatusBadge status={ex.status} />
                         </td>
 
                         {/* Action Link */}
-                        <td className="py-2.5 px-4 text-right">
+                        <td className="py-2 px-3 text-right">
                           <Link
                             href={`/audits/executions/${ex.id}`}
                             className="px-2.5 py-1 rounded bg-secondary hover:bg-secondary/80 text-[11px] font-semibold transition"
@@ -440,7 +495,7 @@ export default function BulkAuditJobResultsPage() {
                       {/* Expandable Opportunity Summary */}
                       {isExpanded && (
                         <tr className="bg-secondary/30">
-                          <td colSpan={12} className="py-4 px-8">
+                          <td colSpan={13} className="py-4 px-8">
                             {ex.status === "FAILED" ? (
                               <div className="p-3.5 rounded-md border border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs space-y-1.5">
                                 <div className="font-semibold flex items-center gap-1.5">

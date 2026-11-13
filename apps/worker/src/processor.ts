@@ -47,6 +47,8 @@ export async function processAuditJob(job: Job<AuditJobPayload>): Promise<void> 
         accessibilityScore: psiResult.scores.accessibility,
         bestPracticesScore: psiResult.scores.bestPractices,
         seoScore: psiResult.scores.seo,
+        agenticScore: psiResult.scores.agenticBrowsing ?? null,
+        agenticRatio: psiResult.scores.agenticRatio ?? null,
         fcpMs: psiResult.labMetrics.fcpMs,
         lcpMs: psiResult.labMetrics.lcpMs,
         tbtMs: psiResult.labMetrics.tbtMs,
