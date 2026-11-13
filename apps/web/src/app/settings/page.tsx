@@ -20,6 +20,9 @@ import {
   Server,
   Terminal,
   HardDrive,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 const MODEL_PRESETS: Record<string, Array<{ id: string; label: string; badge?: string }>> = {
@@ -82,6 +85,7 @@ const MODEL_PRESETS: Record<string, Array<{ id: string; label: string; badge?: s
 export default function SettingsPage() {
   const [streamShield, setStreamShield] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [showGuide, setShowGuide] = useState(false);
   const [serverSettings, setServerSettings] = useState<any>(null);
 
   // Form states
@@ -260,6 +264,70 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Interactive Step-by-Step API Key Tutorial Card */}
+      <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+        <button
+          type="button"
+          onClick={() => setShowGuide(!showGuide)}
+          className="w-full flex items-center justify-between text-left text-xs font-semibold text-primary cursor-pointer"
+        >
+          <span className="flex items-center gap-2">
+            <HelpCircle className="w-4 h-4" />
+            <span>How to get your free Google PSI &amp; AI keys in 60 seconds (Step-by-Step Guide)</span>
+          </span>
+          {showGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        {showGuide && (
+          <div className="pt-2 border-t border-primary/20 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-muted-foreground animate-in fade-in duration-200">
+            {/* Guide 1: Google PSI */}
+            <div className="p-3 rounded-md bg-card border border-border space-y-2">
+              <div className="font-semibold text-foreground flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-primary" />
+                <span>1. Google PageSpeed (Free)</span>
+              </div>
+              <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
+                <li>Go to <a href="https://developers.google.com/speed/docs/insights/v5/get-started" target="_blank" rel="noreferrer" className="text-primary hover:underline">PageSpeed Getting Started</a>.</li>
+                <li>Click <strong>&quot;Get a Key&quot;</strong> and choose or create a Google Cloud project.</li>
+                <li>Copy the key (starts with <code className="font-mono">AIzaSy...</code>).</li>
+                <li>Paste it in <strong>Google Cloud API Key</strong> below and click <strong>Test Connection</strong>.</li>
+              </ol>
+              <div className="text-[10px] text-emerald-500 font-medium">Free: 25,000 queries/day (no credit card)</div>
+            </div>
+
+            {/* Guide 2: Google Gemini */}
+            <div className="p-3 rounded-md bg-card border border-border space-y-2">
+              <div className="font-semibold text-foreground flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>2. Google Gemini (Free)</span>
+              </div>
+              <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
+                <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline">Google AI Studio</a>.</li>
+                <li>Sign in with your standard Google account.</li>
+                <li>Click <strong>&quot;Create API key&quot;</strong>.</li>
+                <li>Select <strong>Google Gemini</strong> below, paste the key, and test.</li>
+              </ol>
+              <div className="text-[10px] text-emerald-500 font-medium">Free: 15 RPM with Gemini 1.5 Flash</div>
+            </div>
+
+            {/* Guide 3: Groq Cloud */}
+            <div className="p-3 rounded-md bg-card border border-border space-y-2">
+              <div className="font-semibold text-foreground flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                <span>3. Groq Cloud (Ultra Fast)</span>
+              </div>
+              <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
+                <li>Go to <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="text-primary hover:underline">Groq Console</a>.</li>
+                <li>Sign in with GitHub or Google.</li>
+                <li>Click <strong>&quot;Create API Key&quot;</strong> and copy <code className="font-mono">gsk_...</code>.</li>
+                <li>Select <strong>Groq Cloud</strong> below, paste the key, and test.</li>
+              </ol>
+              <div className="text-[10px] text-emerald-500 font-medium">Free: 500+ tok/s with Llama 3.3 70B &amp; Qwen</div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Section 1: Google PageSpeed & CrUX Integration */}
       <div className="p-5 rounded-lg border border-border bg-card shadow-sm space-y-4">
