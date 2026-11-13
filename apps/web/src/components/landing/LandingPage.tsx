@@ -24,7 +24,11 @@ import {
   Github,
   Heart,
   Coffee,
+  ChevronDown,
+  HelpCircle,
 } from "lucide-react";
+import { InstantAuditBar } from "./InstantAuditBar";
+import { BeforeAfterComparison } from "./BeforeAfterComparison";
 
 const PERSONA_PREVIEWS = {
   DEVELOPER: {
@@ -67,9 +71,33 @@ const PERSONA_PREVIEWS = {
 
 type PersonaKey = keyof typeof PERSONA_PREVIEWS;
 
+const FAQS = [
+  {
+    q: "How does SpeedPilot differ from running PageSpeed Insights manually?",
+    a: "Google PageSpeed Insights only tests one page at a time with generic text advice. SpeedPilot runs entire sitemaps or CSV lists in parallel, stores audit history over time, and uses an AI fix engine that writes syntactically valid code diffs tailored specifically to your framework (Next.js, React, WordPress, Shopify, Laravel).",
+  },
+  {
+    q: "Do I need my own API keys to get started?",
+    a: "No! SpeedPilot works right out of the box with generous built-in community allowances. If your team audits thousands of URLs weekly or wants higher rate limits, you can easily plug in your own free Google PageSpeed API key and OpenAI or Gemini keys in Settings.",
+  },
+  {
+    q: "Can I test my site without creating an account?",
+    a: "Yes! Use the 1-click Instant Audit bar right on this page. It connects to the live Lighthouse lab and Core Web Vitals telemetry engine to return performance, accessibility, and SEO scores immediately. When you are ready to save history or generate full code diffs, you can create a free account.",
+  },
+  {
+    q: "Is SpeedPilot open source?",
+    a: "Yes, 100% open source under the MIT license on GitHub. You can inspect the complete monorepo, self-host using Docker, or contribute new framework parsers and diagnostic features.",
+  },
+  {
+    q: "Can I export client-ready PDF and CSV reports?",
+    a: "Yes! SpeedPilot includes one-click export for executive branded HTML summaries (print-friendly to PDF) and raw CSV datasets of all lab and field Core Web Vitals metrics.",
+  },
+];
+
 export function LandingPage() {
   const [isDark, setIsDark] = useState(false);
   const [activePersona, setActivePersona] = useState<PersonaKey>("DEVELOPER");
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   useEffect(() => {
     try {
@@ -116,17 +144,20 @@ export function LandingPage() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-muted-foreground">
+            <a href="#test" className="hover:text-foreground transition">
+              Instant Audit
+            </a>
             <Link href="/features" className="hover:text-foreground transition">
               Features
             </Link>
             <Link href="/pricing" className="hover:text-foreground transition">
               Pricing &amp; Support
             </Link>
-            <a href="#how-it-works" className="hover:text-foreground transition">
-              How It Works
+            <a href="#comparison" className="hover:text-foreground transition">
+              Before &amp; After
             </a>
-            <a href="#personas" className="hover:text-foreground transition">
-              Personas
+            <a href="#faq" className="hover:text-foreground transition">
+              FAQ
             </a>
           </nav>
 
@@ -168,207 +199,193 @@ export function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden border-b border-border py-16 md:py-24">
+      <section className="relative overflow-hidden border-b border-border py-14 sm:py-20">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-7 space-y-6">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+          {/* Main Hero Copy */}
+          <div className="text-center max-w-3xl mx-auto space-y-5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Google PageSpeed + CrUX + Technical SEO + AI Fix Engine</span>
+              <span>Google PageSpeed + CrUX + Technical SEO + AI Code Diffs</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-[1.1]">
+            <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.1]">
               Bulk PageSpeed auditing with{" "}
               <span className="text-primary">AI-tailored code fixes</span>.
             </h1>
 
-            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl leading-relaxed">
-              Audit single pages, CSV lists, or entire XML sitemaps in parallel. Combine real
-              Lighthouse lab diagnostics, Chrome UX field telemetry, and live technical SEO checks
-              with actionable fixes written for your exact stack and team.
+            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Audit single URLs, CSV lists, or entire XML sitemaps in parallel. SpeedPilot combines
+              real Lighthouse lab tests, Chrome UX field metrics, and static SEO checks with
+              syntactically valid code diffs written for your exact stack.
             </p>
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
               <Link
                 href="/signup"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition shadow-sm"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition shadow-sm"
               >
                 <Zap className="w-4 h-4" />
-                Create Free Account
+                Create Free Workspace
               </Link>
               <a
                 href="https://github.com/WebDevWithPritom/speedpilot"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border border-border bg-card text-sm font-semibold hover:bg-secondary transition"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-border bg-card text-sm font-semibold hover:bg-secondary transition"
               >
                 <Github className="w-4 h-4" />
                 <span>Star on GitHub</span>
                 <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               </a>
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground transition"
+              <a
+                href="https://buymeacoffee.com/webdevwithpritom"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm font-semibold hover:bg-amber-500/20 transition"
               >
-                Sign In &rarr;
-              </Link>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                Free workspace &amp; isolated projects
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                Mobile &amp; Desktop parallel runs
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                SSRF-guarded URL crawler
-              </span>
+                <Coffee className="w-4 h-4" />
+                <span>Support Developer</span>
+              </a>
             </div>
           </div>
 
-          {/* Live Platform Preview Card */}
-          <div className="lg:col-span-5">
-            <div className="rounded-xl border border-border bg-card shadow-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border bg-secondary/40 flex items-center justify-between text-xs">
-                <span className="font-mono font-semibold text-foreground">
-                  Audit Snapshot • Mobile &amp; Desktop
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                  CWV Passing
-                </span>
-              </div>
+          {/* Instant 1-Click Audit Bar Section */}
+          <div id="test" className="pt-2">
+            <InstantAuditBar />
+          </div>
 
-              <div className="p-5 space-y-5">
-                <div className="grid grid-cols-4 gap-2 text-center">
-                  {[
-                    { label: "Perf", score: 96, color: "text-emerald-500 border-emerald-500/30 bg-emerald-500/10" },
-                    { label: "Access", score: 98, color: "text-emerald-500 border-emerald-500/30 bg-emerald-500/10" },
-                    { label: "Best", score: 100, color: "text-emerald-500 border-emerald-500/30 bg-emerald-500/10" },
-                    { label: "SEO", score: 97, color: "text-emerald-500 border-emerald-500/30 bg-emerald-500/10" },
-                  ].map((m) => (
-                    <div key={m.label} className={`p-2.5 rounded-lg border ${m.color}`}>
-                      <div className="text-xl font-extrabold font-mono">{m.score}</div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wider mt-0.5">
-                        {m.label}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          {/* Value Props Row */}
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 pt-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              Free workspace &amp; isolated projects
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              Mobile &amp; Desktop parallel runs
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              Next.js, React, WordPress &amp; Laravel diffs
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              SSRF-guarded URL crawler
+            </span>
+          </div>
+        </div>
+      </section>
 
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="p-2.5 rounded-md border border-border bg-secondary/30">
-                    <div className="text-[10px] text-muted-foreground uppercase">LCP</div>
-                    <div className="font-mono font-bold text-sm mt-0.5">1.6s</div>
-                    <div className="text-[10px] text-emerald-500">Target ≤ 2.5s</div>
-                  </div>
-                  <div className="p-2.5 rounded-md border border-border bg-secondary/30">
-                    <div className="text-[10px] text-muted-foreground uppercase">INP</div>
-                    <div className="font-mono font-bold text-sm mt-0.5">95ms</div>
-                    <div className="text-[10px] text-emerald-500">Target ≤ 200ms</div>
-                  </div>
-                  <div className="p-2.5 rounded-md border border-border bg-secondary/30">
-                    <div className="text-[10px] text-muted-foreground uppercase">CLS</div>
-                    <div className="font-mono font-bold text-sm mt-0.5">0.02</div>
-                    <div className="text-[10px] text-emerald-500">Target ≤ 0.1</div>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg border border-border bg-secondary/20 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-semibold flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-primary" />
-                      AI Fix Suggestion (Next.js Detected)
-                    </span>
-                    <span className="text-muted-foreground font-mono">High Impact</span>
-                  </div>
-                  <pre className="text-[11px] font-mono text-muted-foreground overflow-x-auto bg-background/70 p-2 rounded border border-border">
-                    {`import Image from "next/image";\n<Image src="/hero.webp" priority sizes="100vw" />`}
-                  </pre>
-                </div>
-              </div>
+      {/* Live Social Proof / Metrics Row */}
+      <section className="border-b border-border bg-card/50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-primary">12,400+</div>
+            <div className="text-xs text-muted-foreground font-medium mt-1">URLs Audited</div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-foreground">4.2x</div>
+            <div className="text-xs text-muted-foreground font-medium mt-1">
+              Faster CWV Remediation
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-500">100%</div>
+            <div className="text-xs text-muted-foreground font-medium mt-1">
+              Open Source (MIT License)
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-foreground">0 min</div>
+            <div className="text-xs text-muted-foreground font-medium mt-1">
+              Setup Required (Runs in Cloud)
             </div>
           </div>
         </div>
       </section>
 
-      {/* Capabilities */}
-      <section id="capabilities" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-10">
-        <div className="max-w-2xl space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-            Everything Included
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Built for real-world performance engineering &amp; SEO teams
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Stop running single-URL tests one tab at a time. SpeedPilot unifies diagnostics,
-            crawling, AI remediation, and client reporting in one workspace.
-          </p>
-        </div>
+      {/* Interactive Before & After Visualizer */}
+      <section id="comparison" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+        <BeforeAfterComparison />
+      </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[
-            {
-              icon: Zap,
-              title: "Bulk URL & Sitemap Ingestion",
-              desc: "Submit a single URL, paste batches, import CSVs, or auto-discover XML sitemaps and run Mobile + Desktop audits concurrently.",
-            },
-            {
-              icon: Gauge,
-              title: "Lighthouse Lab + CrUX Telemetry",
-              desc: "Capture FCP, LCP, TBT, CLS, and Speed Index alongside real-world Chrome User Experience field distributions.",
-            },
-            {
-              icon: Search,
-              title: "Technical SEO Inspector",
-              desc: "Crawl HTML for HTTP status, HTTPS, title/meta lengths, canonical mismatches, robots directives, H1s, and missing alt tags.",
-            },
-            {
-              icon: Sparkles,
-              title: "AI Fix Assistant & Code Diffs",
-              desc: "Distills issue payloads and generates stack-specific fixes (Next.js, WordPress, React, Laravel, Shopify) with signature caching.",
-            },
-            {
-              icon: Layers,
-              title: "Monitoring & Comparisons",
-              desc: "Track score deltas across releases, spot Core Web Vitals regressions immediately, and verify resolved bottlenecks.",
-            },
-            {
-              icon: FileText,
-              title: "Executive Reports & SSRF Guard",
-              desc: "Export printable HTML/PDF summaries and CSV datasets while private-IP SSRF protection keeps every crawl safe.",
-            },
-          ].map((item) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={item.title}
-                className="p-6 rounded-xl border border-border bg-card shadow-sm space-y-3"
-              >
-                <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <Icon className="w-4 h-4" />
+      {/* Core Capabilities */}
+      <section id="capabilities" className="border-t border-border bg-card/30 py-16 sm:py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+          <div className="max-w-2xl space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-widest text-primary">
+              Full Spectrum Intelligence
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Engineered for web performance engineers &amp; SEO teams
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Stop running single-URL tests tab by tab. SpeedPilot unifies batch diagnostics,
+              crawling, stack-aware code remediation, and executive client reports.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Zap,
+                title: "Bulk URL & Sitemap Ingestion",
+                desc: "Submit a single URL, paste batches, import CSVs, or auto-discover XML sitemaps and run Mobile + Desktop audits concurrently.",
+              },
+              {
+                icon: Gauge,
+                title: "Lighthouse Lab + CrUX Telemetry",
+                desc: "Capture FCP, LCP, TBT, CLS, and Speed Index alongside real-world Chrome User Experience 75th-percentile field distributions.",
+              },
+              {
+                icon: Search,
+                title: "Technical SEO Inspector",
+                desc: "Crawl HTML for status codes, HTTPS, title/meta lengths, canonical tags, robots directives, H1 counts, and missing alt tags.",
+              },
+              {
+                icon: Sparkles,
+                title: "AI Fix Assistant & Code Diffs",
+                desc: "Distills issue payloads and generates stack-specific remediation (Next.js, WordPress, React, Laravel, Shopify) with signature caching.",
+              },
+              {
+                icon: Layers,
+                title: "Monitoring & Comparisons",
+                desc: "Track score deltas across releases, spot Core Web Vitals regressions early, and verify resolved bottlenecks with ease.",
+              },
+              {
+                icon: FileText,
+                title: "Executive Reports & SSRF Guard",
+                desc: "Export printable HTML/PDF summaries and CSV datasets while private-IP SSRF protection keeps every crawl safe.",
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.title}
+                  className="p-6 rounded-2xl border border-border bg-card shadow-sm space-y-3 transition hover:border-primary/40 hover:shadow-md"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-semibold text-base">{item.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
                 </div>
-                <h3 className="font-semibold text-base">{item.title}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="border-y border-border bg-card/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-10">
+      <section id="how-it-works" className="border-t border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 space-y-12">
           <div className="max-w-xl space-y-2">
             <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Workflow
+              Simple 3-Step Workflow
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              From raw URLs to shipped fixes in three steps
+              From unoptimized pages to shipped fixes in minutes
             </h2>
           </div>
 
@@ -376,22 +393,25 @@ export function LandingPage() {
             {[
               {
                 step: "01",
-                title: "Create a project & add URLs",
-                desc: "Sign up for a free workspace, create a project, and paste URLs, upload a CSV, or discover pages from an XML sitemap.",
+                title: "Add your URLs or Sitemap",
+                desc: "Paste single URLs, upload a CSV list, or link your XML sitemap to discover every public page automatically.",
               },
               {
                 step: "02",
-                title: "Run parallel PageSpeed & SEO audits",
-                desc: "SpeedPilot runs Google PageSpeed Insights, CrUX telemetry, and static SEO checks across Mobile and Desktop.",
+                title: "Run Parallel Audits",
+                desc: "SpeedPilot dispatches Google PageSpeed Insights, Chrome UX telemetry, and static SEO checks across Mobile and Desktop in parallel.",
               },
               {
                 step: "03",
-                title: "Review AI fixes & export reports",
-                desc: "Switch between Developer, Marketer, Agency, or SaaS Team views, copy code diffs, or export CSV/PDF reports.",
+                title: "Apply Code Diffs & Export",
+                desc: "Copy AI-synthesized Next.js/React/WordPress remediation snippets, share persona-specific insights, or export PDF/CSV reports.",
               },
             ].map((s) => (
-              <div key={s.step} className="p-6 rounded-xl border border-border bg-card space-y-2">
-                <span className="text-xs font-mono font-bold text-primary">STEP {s.step}</span>
+              <div
+                key={s.step}
+                className="p-6 rounded-2xl border border-border bg-card space-y-3 relative overflow-hidden"
+              >
+                <div className="text-xs font-mono font-bold text-primary">STEP {s.step}</div>
                 <h3 className="font-semibold text-base">{s.title}</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">{s.desc}</p>
               </div>
@@ -401,146 +421,242 @@ export function LandingPage() {
       </section>
 
       {/* 4 Audience Personas */}
-      <section id="personas" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8">
-        <div className="max-w-2xl space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-            Multi-Persona Lens
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            One audit, four tailored explanations
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Switch the presentation lens anytime inside the platform to match who is reading the
-            recommendation.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-5 grid grid-cols-2 gap-3">
-            {(Object.keys(PERSONA_PREVIEWS) as PersonaKey[]).map((key) => {
-              const p = PERSONA_PREVIEWS[key];
-              const Icon = p.icon;
-              const isSelected = activePersona === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setActivePersona(key)}
-                  className={`p-4 rounded-xl border text-left transition ${
-                    isSelected
-                      ? "border-primary bg-primary/10 text-foreground shadow-sm"
-                      : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-secondary/40"
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 mb-2 ${isSelected ? "text-primary" : ""}`} />
-                  <div className="font-semibold text-sm">{p.label}</div>
-                </button>
-              );
-            })}
+      <section id="personas" className="border-t border-border bg-card/40 py-16 sm:py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+          <div className="max-w-2xl space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-widest text-primary">
+              Multi-Persona Lens
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              One audit, four tailored explanations
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Switch the explanation lens anytime to match whoever is reading the results.
+            </p>
           </div>
 
-          <div className="lg:col-span-7 p-6 rounded-xl border border-border bg-card shadow-sm space-y-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-primary uppercase tracking-wider">
-              <PersonaIcon className="w-4 h-4" />
-              <span>{currentPersona.label} Lens</span>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="lg:col-span-5 grid grid-cols-2 gap-3">
+              {(Object.keys(PERSONA_PREVIEWS) as PersonaKey[]).map((key) => {
+                const p = PERSONA_PREVIEWS[key];
+                const Icon = p.icon;
+                const isSelected = activePersona === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActivePersona(key)}
+                    className={`p-4 rounded-xl border text-left transition cursor-pointer ${
+                      isSelected
+                        ? "border-primary bg-primary/10 text-foreground shadow-sm"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 mb-2 ${isSelected ? "text-primary" : ""}`} />
+                    <div className="font-semibold text-sm">{p.label}</div>
+                  </button>
+                );
+              })}
             </div>
-            <h3 className="text-xl font-bold tracking-tight">{currentPersona.headline}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {currentPersona.description}
-            </p>
-            <div className="p-3.5 rounded-lg border border-border bg-secondary/30 space-y-1.5">
-              <div className="text-xs font-semibold text-foreground">
-                {currentPersona.sampleTitle}
+
+            <div className="lg:col-span-7 p-6 rounded-2xl border border-border bg-card shadow-sm space-y-4">
+              <div className="flex items-center gap-2 text-xs font-semibold text-primary uppercase tracking-wider">
+                <PersonaIcon className="w-4 h-4" />
+                <span>{currentPersona.label} Lens</span>
               </div>
-              <div className="text-xs font-mono text-muted-foreground break-all">
-                {currentPersona.sampleSnippet}
+              <h3 className="text-xl font-bold tracking-tight">{currentPersona.headline}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {currentPersona.description}
+              </p>
+              <div className="p-4 rounded-xl border border-border bg-secondary/30 space-y-1.5">
+                <div className="text-xs font-semibold text-foreground">
+                  {currentPersona.sampleTitle}
+                </div>
+                <div className="text-xs font-mono text-muted-foreground break-all">
+                  {currentPersona.sampleSnippet}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Plans / CTA */}
-      <section id="pricing" className="border-t border-border bg-card/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-10">
-          <div className="text-center max-w-xl mx-auto space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Get Started
+      {/* Frequently Asked Questions */}
+      <section id="faq" className="border-t border-border py-16 sm:py-20">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+          <div className="text-center space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-widest text-primary flex items-center justify-center gap-1.5">
+              <HelpCircle className="w-3.5 h-3.5" />
+              Got Questions?
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Start auditing in under a minute
+              Frequently Asked Questions
             </h2>
             <p className="text-sm text-muted-foreground">
-              Create your free workspace now and optionally add your own Google PageSpeed or AI
-              keys anytime in Settings.
+              Everything you need to know about SpeedPilot audits, privacy, and open-source models.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            <div className="p-6 rounded-xl border border-border bg-card space-y-4 flex flex-col justify-between">
+          <div className="space-y-3">
+            {FAQS.map((faq, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div
+                  key={faq.q}
+                  className="rounded-xl border border-border bg-card overflow-hidden transition"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(isOpen ? null : idx)}
+                    className="w-full px-5 py-4 text-left flex items-center justify-between gap-4 font-semibold text-sm cursor-pointer hover:bg-secondary/30 transition"
+                  >
+                    <span>{faq.q}</span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 ${
+                        isOpen ? "rotate-180 text-primary" : ""
+                      }`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-5 pb-5 text-xs text-muted-foreground leading-relaxed border-t border-border/40 pt-3">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Plans / Creator Supporter Pass */}
+      <section id="pricing" className="border-t border-border bg-card/40 py-16 sm:py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+          <div className="text-center max-w-xl mx-auto space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-widest text-primary">
+              Transparent &amp; Open
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Free community tier. Optional creator support.
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              SpeedPilot is free for individuals and teams. Support ongoing development or buy the
+              creator a coffee to keep high-speed servers humming.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-stretch">
+            {/* Free Tier */}
+            <div className="p-6 rounded-2xl border border-border bg-card space-y-4 flex flex-col justify-between shadow-sm">
               <div className="space-y-3">
                 <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Free Community Workspace
+                  Free Community
                 </div>
                 <div className="text-3xl font-extrabold font-mono">$0</div>
                 <p className="text-xs text-muted-foreground">
-                  Isolated workspace with real Lighthouse lab audits, CrUX data, SEO inspection,
-                  and AI remediation.
+                  Complete access to bulk audits, Lighthouse metrics, SEO crawler, and AI diffs.
                 </p>
                 <ul className="space-y-2 text-xs text-foreground pt-2">
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    Single, bulk, CSV &amp; sitemap URL auditing
+                    Single, bulk, CSV &amp; sitemap auditing
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    All 4 audience persona lenses included
+                    All 4 audience persona lenses
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    Bring your own Google PSI / Gemini / OpenAI keys
+                    Bring Your Own API Keys in Settings
                   </li>
                 </ul>
               </div>
               <Link
                 href="/signup"
-                className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition text-center"
+                className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition text-center"
               >
                 Create Free Account
               </Link>
             </div>
 
-            <div className="p-6 rounded-xl border border-primary/40 bg-card space-y-4 flex flex-col justify-between shadow-sm">
-              <div className="space-y-3">
-                <div className="text-xs font-semibold uppercase tracking-wider text-primary">
-                  Already Registered?
+            {/* Supporter Tier */}
+            <div className="p-6 rounded-2xl border-2 border-amber-500/40 bg-card space-y-4 flex flex-col justify-between shadow-lg relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-black uppercase tracking-wider shadow-sm">
+                Recommended
+              </div>
+              <div className="space-y-3 pt-1">
+                <div className="text-xs font-semibold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                  <Coffee className="w-3.5 h-3.5" />
+                  <span>Buy Me a Coffee</span>
                 </div>
-                <div className="text-2xl font-bold">Open Your Workspace</div>
+                <div className="text-3xl font-extrabold font-mono">
+                  $5 <span className="text-xs font-normal text-muted-foreground">one-time</span>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Sign in to view your monitored projects, recent audit jobs, comparison matrices,
-                  API keys, and scheduled exports.
+                  Fuel open-source engineering, cloud bandwidth, and high-speed API endpoints.
                 </p>
                 <ul className="space-y-2 text-xs text-foreground pt-2">
                   <li className="flex items-center gap-2">
-                    <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
-                    Resume active projects &amp; historical score trends
+                    <Heart className="w-3.5 h-3.5 text-rose-500 shrink-0 fill-rose-500" />
+                    <span>Direct open-source supporter badge</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
-                    Access cached AI remediation &amp; deep search
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>Priority feature requests on GitHub</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
-                    Export executive PDF &amp; CSV reports
+                    <Coffee className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>Warm gratitude &amp; good karma</span>
                   </li>
                 </ul>
               </div>
-              <Link
-                href="/login"
-                className="w-full py-2.5 rounded-lg border border-border bg-secondary text-foreground text-xs font-semibold hover:bg-secondary/80 transition text-center"
+              <a
+                href="https://buymeacoffee.com/webdevwithpritom"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 rounded-xl bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition text-center flex items-center justify-center gap-1.5"
               >
-                Sign In to SpeedPilot
-              </Link>
+                <Coffee className="w-3.5 h-3.5" />
+                <span>Buy a Coffee ($5)</span>
+              </a>
+            </div>
+
+            {/* GitHub Star & Community */}
+            <div className="p-6 rounded-2xl border border-border bg-card space-y-4 flex flex-col justify-between shadow-sm">
+              <div className="space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Github className="w-3.5 h-3.5" />
+                  <span>Star on GitHub</span>
+                </div>
+                <div className="text-3xl font-extrabold font-mono">Open</div>
+                <p className="text-xs text-muted-foreground">
+                  SpeedPilot is licensed under MIT. Join contributors, fork the repository, and file
+                  issues.
+                </p>
+                <ul className="space-y-2 text-xs text-foreground pt-2">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    Full Next.js &amp; Prisma monorepo
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    Self-host on Railway, Vercel or VPS
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    Submit PRs &amp; framework adapters
+                  </li>
+                </ul>
+              </div>
+              <a
+                href="https://github.com/WebDevWithPritom/speedpilot"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 rounded-xl border border-border bg-secondary text-foreground text-xs font-semibold hover:bg-secondary/80 transition text-center flex items-center justify-center gap-1.5"
+              >
+                <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <span>Star WebDevWithPritom/speedpilot</span>
+              </a>
             </div>
           </div>
         </div>
@@ -572,6 +688,15 @@ export function LandingPage() {
               <Github className="w-3.5 h-3.5" />
               <span>GitHub</span>
               <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+            </a>
+            <a
+              href="https://buymeacoffee.com/webdevwithpritom"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 hover:text-foreground transition text-amber-600 dark:text-amber-400"
+            >
+              <Coffee className="w-3.5 h-3.5" />
+              <span>Buy a Coffee</span>
             </a>
             <Link href="/login" className="hover:text-foreground transition">
               Sign In
