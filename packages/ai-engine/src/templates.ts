@@ -1,4 +1,5 @@
 import { AIRecommendationOutput, TechStack } from "@speedpilot/shared";
+import { detectVendorSignatures, VendorMatch } from "./vendor-intelligence.js";
 
 export interface TemplateEvidenceItem {
   url?: string;
@@ -159,6 +160,20 @@ function buildContextHeader(ctx?: RecommendationContextOptions): string {
   return lines.length ? `${lines.join("\n")}\n\n` : "";
 }
 
+function getVendorFixSnippet(vendors: VendorMatch[], stack: TechStack): string {
+  if (!vendors.length || !vendors[0]) return "";
+  const v = vendors[0];
+  const code =
+    stack === "NEXTJS"
+      ? v.recommendedRealFix.NEXTJS
+      : stack === "WORDPRESS" || stack === "WOOCOMMERCE"
+      ? v.recommendedRealFix.WORDPRESS
+      : stack === "SHOPIFY"
+      ? v.recommendedRealFix.SHOPIFY
+      : v.recommendedRealFix.GENERAL;
+  return `\n\n// Vendor-Specific Real Fix (${v.vendorName}):\n// ${v.impactDescription}\n${code}`;
+}
+
 export function getDeterministicRecommendation(
   issueCode: string,
   techStack: TechStack,
@@ -174,6 +189,9 @@ export function getDeterministicRecommendation(
   const { firstParty, thirdParty } = splitUrlsByOrigin(urls, ctx?.targetUrl);
   const origins = extractOrigins(ctx?.targetUrl || evidenceResource, evidenceItems);
   const contextHeader = buildContextHeader(ctx);
+  const detectedVendors = detectVendorSignatures(urls);
+  const vendorSnippet = getVendorFixSnippet(detectedVendors, techStack);
+
   const subLower = (ctx?.subStacks || []).join(" ").toLowerCase();
   const urlLower = urls.join(" ").toLowerCase();
   const isLiteSpeed = subLower.includes("litespeed") || urlLower.includes("/litespeed/");
@@ -187,7 +205,7 @@ export function getDeterministicRecommendation(
     ? `\n<!-- Detected from your audit:\n${urls.map((u) => `     - ${u}`).join("\n")}\n-->`
     : "";
 
-  // Render-blocking resources (Lighthouse v10-13)
+  // 1. Render-blocking resources (Lighthouse v10-13)
   if (issueCode === "render-blocking-resources" || issueCode === "render-blocking-insight") {
     const detectedPreloads = preloadUrls.length
       ? `\n\n<!-- Exact <head> preloads (CSS/fonts) & defer (JS) for unhinted files -->\n${buildPreloadSnippet(preloadUrls)}`
@@ -204,7 +222,7 @@ export function getDeterministicRecommendation(
         explanationDeveloper: `Synchronous CSS or JS links in <head> block the browser parser from building the Render Tree${resourceNotice}. In Next.js App Router, rely on CSS Modules or Next.js built-in font/style optimization with 'next/font' and preload non-critical CSS.`,
         explanationAgency: `High impact optimization. Eliminating this block directly recovers ~${wastedMs || 500}ms on mobile devices, lifting Core Web Vitals LCP into the 'Good' tier.`,
         explanationSaaSTeam: `Core render path bottleneck. Resolving this protects the 75th percentile LCP target during incoming marketing campaigns.`,
-        remediationCodeSnippet: `// Next.js App Router (app/layout.tsx)\n// 1. Use next/font to automatically inline critical font CSS\nimport { Inter } from 'next/font/google';\nconst inter = Inter({ subsets: ['latin'], display: 'swap' });\n\n// 2. Preload non-critical external third-party styles\n<link rel="preload" href="${primaryUrl || "/theme-extra.css"}" as="style" />\n<link rel="stylesheet" href="${primaryUrl || "/theme-extra.css"}" media="print" onLoad="this.media='all'" />${detectedPreloads}`,
+        remediationCodeSnippet: `// Next.js App Router (app/layout.tsx)\n// 1. Use next/font to automatically inline critical font CSS\nimport { Inter } from 'next/font/google';\nconst inter = Inter({ subsets: ['latin'], display: 'swap' });\n\n// 2. Preload non-critical external third-party styles\n<link rel="preload" href="${primaryUrl || "/theme-extra.css"}" as="style" />\n<link rel="stylesheet" href="${primaryUrl || "/theme-extra.css"}" media="print" onLoad="this.media='all'" />${detectedPreloads}${vendorSnippet}`,
         implementationSteps: [
           "Identify critical above-the-fold styles and inline them into layout.tsx",
           "Convert external render-blocking stylesheets to asynchronous loading using media='print' pattern",
@@ -226,7 +244,7 @@ export function getDeterministicRecommendation(
         explanationDeveloper: `Theme and plugin scripts enqueued via wp_enqueue_style/script are rendering in <head> without 'defer' or async attributes. Critical CSS is not inlined.`,
         explanationAgency: `Essential fix for client satisfaction. Inlining critical CSS and deferring non-essential plugin styles will yield an immediate 10-15 point PageSpeed increase.`,
         explanationSaaSTeam: `WordPress theme asset bloat is degrading mobile conversion rates. Apply critical CSS extraction.`,
-        remediationCodeSnippet: `${contextHeader}${wpPluginNote}// In your theme's functions.php or custom plugin:\nadd_filter('style_loader_tag', function($html, $handle) {\n    if ($handle === 'non-critical-plugin-style') {\n        return str_replace("rel='stylesheet'", "rel='preload' as='style' onload=\\"this.onload=null;this.rel='stylesheet'\\"", $html);\n    }\n    return $html;\n}, 10, 2);${detectedPreloads}`,
+        remediationCodeSnippet: `${contextHeader}${wpPluginNote}// In your theme's functions.php or custom plugin:\nadd_filter('style_loader_tag', function($html, $handle) {\n    if ($handle === 'non-critical-plugin-style') {\n        return str_replace("rel='stylesheet'", "rel='preload' as='style' onload=\\"this.onload=null;this.rel='stylesheet'\\"", $html);\n    }\n    return $html;\n}, 10, 2);${detectedPreloads}${vendorSnippet}`,
         implementationSteps: [
           "Audit active plugins enqueuing styles on every page",
           "Configure a critical CSS solution (or lightweight caching plugin) to inline above-the-fold CSS",
@@ -247,7 +265,7 @@ export function getDeterministicRecommendation(
         explanationDeveloper: `Shopify Liquid theme.liquid contains synchronous asset_url | stylesheet_tag in the <head>. Third-party app scripts are injected synchronously.`,
         explanationAgency: `Client e-commerce stores lose 7% conversion per second of delay. Eliminating render blocking in theme.liquid gives a noticeable speed boost.`,
         explanationSaaSTeam: `Checkout entry page is blocked by app scripts. Optimize asset delivery in Shopify theme.`,
-        remediationCodeSnippet: `<!-- In theme.liquid: replace standard stylesheet_tag with preload -->\n{{ 'theme.css' | asset_url | preload_tag: as: 'style' }}\n<link rel="stylesheet" href="{{ 'theme.css' | asset_url }}" media="print" onload="this.media='all'">${detectedPreloads}`,
+        remediationCodeSnippet: `<!-- In layout/theme.liquid: replace standard stylesheet_tag with preload -->\n{{ 'theme.css' | asset_url | preload_tag: as: 'style' }}\n<link rel="stylesheet" href="{{ 'theme.css' | asset_url }}" media="print" onload="this.media='all'">${detectedPreloads}${vendorSnippet}`,
         implementationSteps: [
           "Review installed Shopify Apps in theme.liquid and eliminate orphaned app snippets",
           "Preload main theme CSS and load non-critical stylesheets asynchronously",
@@ -261,14 +279,14 @@ export function getDeterministicRecommendation(
       };
     }
 
-    // Default / Custom
+    // Default / Custom / React SPA
     return {
-      detectedStack: "CUSTOM",
+      detectedStack: techStack || "CUSTOM",
       explanationMarketer: `Styles and scripts are stopping the browser from showing your page content right away${savingsNotice}.`,
       explanationDeveloper: `Synchronous CSS and JS assets in the <head> block DOM construction. Defer scripts and preload styles.`,
       explanationAgency: `High priority item for core web vitals compliance.`,
       explanationSaaSTeam: `FCP and LCP improvement target.`,
-      remediationCodeSnippet: `<!-- Add defer to non-critical scripts & preload styles in <head> -->\n${urls.length ? buildPreloadSnippet(urls) : `<script src="/bundle.js" defer></script>\n<link rel="preload" href="/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">`}${flaggedListComment}`,
+      remediationCodeSnippet: `<!-- Add defer to non-critical scripts & preload styles in <head> -->\n${urls.length ? buildPreloadSnippet(urls) : `<script src="/bundle.js" defer></script>\n<link rel="preload" href="/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">`}${flaggedListComment}${vendorSnippet}`,
       implementationSteps: [
         "Add defer or async to all non-critical <script> tags so HTML parsing does not pause",
         "Preload above-the-fold stylesheets with <link rel='preload' as='style'> and inline critical hero CSS into <head>",
@@ -281,13 +299,228 @@ export function getDeterministicRecommendation(
     };
   }
 
-  // Network dependency tree / Preconnect / Preload / Prefetch hints
+  // 2. Third-Party Scripts & Facades (third-party-facades, third-party-summary)
+  if (issueCode === "third-party-facades" || (issueCode === "third-party-summary" && detectedVendors.length > 0)) {
+    const topVendor = detectedVendors[0];
+    const vendorName = topVendor ? topVendor.vendorName : "Third-Party Embed";
+    return {
+      detectedStack: techStack,
+      explanationMarketer: `Heavy third-party widgets (such as ${vendorName}, chat plugins, or video players) load megabytes of scripts before visitors even touch the page${savingsNotice}. Replacing them with an instant preview facade lets the page load 2x faster while keeping full functionality.`,
+      explanationDeveloper: `Audit detected heavy third-party assets${resourceNotice}. Static iframes and eager third-party scripts block main thread compilation. Implement the 'Facade Pattern': render an interactive thumbnail/button first, and only initialize the heavy vendor bundle upon user click or scroll.`,
+      explanationAgency: `High ROI optimization that typically saves 400KB-1.2MB of JavaScript and cuts Total Blocking Time by 300-700ms.`,
+      explanationSaaSTeam: `Prevent external SDKs from polluting the Core Web Vitals budget on marketing and documentation pages.`,
+      remediationCodeSnippet: topVendor
+        ? `${contextHeader}// Optimized Facade for ${topVendor.vendorName}:\n${
+            techStack === "NEXTJS"
+              ? topVendor.recommendedRealFix.NEXTJS
+              : techStack === "WORDPRESS" || techStack === "WOOCOMMERCE"
+              ? topVendor.recommendedRealFix.WORDPRESS
+              : techStack === "SHOPIFY"
+              ? topVendor.recommendedRealFix.SHOPIFY
+              : topVendor.recommendedRealFix.GENERAL
+          }${flaggedListComment}`
+        : `<!-- Click-to-Load Facade for Third-Party Embeds -->\n<div class="video-facade" style="position:relative;cursor:pointer;" onclick="this.innerHTML='<iframe width=\\'100%\\' height=\\'100%\\' src=\\'${primaryUrl || "https://www.youtube.com/embed/VIDEO_ID"}?autoplay=1\\' allow=\\'autoplay\\' frameborder=\\'0\\' allowfullscreen></iframe>'">\n  <img src="/thumbnail-placeholder.webp" alt="Play media" width="800" height="450" loading="lazy">\n  <button type="button" aria-label="Play" class="play-btn">▶</button>\n</div>${flaggedListComment}`,
+      implementationSteps: [
+        `Replace eager ${vendorName} embed with a lightweight CSS/image facade`,
+        "Only load the heavy third-party script or iframe when the user clicks the trigger or reaches idle",
+        "Add preconnect for the third-party domain so it opens fast when activated",
+      ],
+      verificationSteps: [
+        "Check Network panel to confirm third-party script is NOT requested on initial page load",
+        "Re-run SpeedPilot audit to verify third-party warnings cleared",
+      ],
+      estimatedDifficulty: "MEDIUM",
+      estimatedImpact: "HIGH",
+    };
+  }
+
+  // 3. Interaction to Next Paint (INP) / Total Blocking Time (TBT) / Long Tasks / Bootup Time
+  if (
+    issueCode === "interaction-to-next-paint" ||
+    issueCode === "inp" ||
+    issueCode === "total-blocking-time" ||
+    issueCode === "tbt" ||
+    issueCode === "long-tasks" ||
+    issueCode === "mainthread-work-breakdown" ||
+    issueCode === "bootup-time"
+  ) {
+    const isNext = techStack === "NEXTJS";
+    const snippet = isNext
+      ? `// Next.js: Yield main thread during heavy calculations & use startTransition
+import { useState, useTransition } from 'react';
+
+// 1. Chunk long loops with scheduler.yield() or requestIdleCallback
+async function processLargeData(items: any[]) {
+  for (let i = 0; i < items.length; i++) {
+    // Process item
+    doWork(items[i]);
+    // Yield every 50 items to keep UI responsive to clicks/taps
+    if (i % 50 === 0 && 'scheduler' in window && 'yield' in (window as any).scheduler) {
+      await (window as any).scheduler.yield();
+    }
+  }
+}
+
+// 2. Wrap state updates that cause heavy re-renders in startTransition
+export function SearchFilter() {
+  const [isPending, startTransition] = useTransition();
+  const [query, setQuery] = useState('');
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Keep input responsive immediately
+    setQuery(e.target.value);
+    // Defer costly list filtering
+    startTransition(() => {
+      filterMassiveList(e.target.value);
+    });
+  };
+  return <input value={query} onChange={handleChange} />;
+}`
+      : `// JavaScript: Break up long tasks (> 50ms) using scheduler.yield() or setTimeout
+async function yieldToMain() {
+  if ('scheduler' in window && 'yield' in (window as any).scheduler) {
+    return await (window as any).scheduler.yield();
+  }
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+// Chunk heavy operations so the browser can process clicks & scrolls
+async function runChunkedTask(items) {
+  for (let i = 0; i < items.length; i++) {
+    processItem(items[i]);
+    if (i % 40 === 0) {
+      await yieldToMain(); // Yields execution back to browser main thread
+    }
+  }
+}
+
+// Add passive flag to scroll/touch event listeners
+window.addEventListener('scroll', onScroll, { passive: true });
+window.addEventListener('touchstart', onTouch, { passive: true });`;
+
+    return {
+      detectedStack: techStack,
+      explanationMarketer: `When users tap buttons, menus, or links, the site freezes or lags before responding${savingsNotice}. Google's Core Web Vitals metric (INP) directly tracks this responsiveness, and sluggish pages get penalized in search rankings.`,
+      explanationDeveloper: `Long tasks exceeding 50ms monopolize the browser's main execution thread${resourceNotice}. Heavy synchronous JavaScript loops, un-debounced input handlers, or large DOM re-renders prevent the browser from responding to user inputs promptly. Yield to the main thread with scheduler.yield() or useTransition.`,
+      explanationAgency: `Direct INP Core Web Vitals compliance. Moving INP from poor (> 500ms) to good (< 200ms) eliminates customer bounce during navigation.`,
+      explanationSaaSTeam: `Prevents main thread locking during dashboard hydration and rich user input interactions.`,
+      remediationCodeSnippet: `${contextHeader}${snippet}${flaggedListComment}${vendorSnippet}`,
+      implementationSteps: [
+        "Identify long tasks in Chrome DevTools Performance tab (tasks highlighted with red triangles > 50ms)",
+        "Break up large JavaScript loops by yielding with scheduler.yield() or setTimeout(..., 0)",
+        "Wrap non-urgent React state updates inside React.startTransition or useDeferredValue",
+        "Add { passive: true } to all wheel, scroll, and touch event handlers",
+      ],
+      verificationSteps: [
+        "Interact with buttons/inputs in DevTools with 4x CPU throttling and verify INP < 200ms",
+        "Re-run SpeedPilot audit to confirm Total Blocking Time (TBT) < 200ms",
+      ],
+      estimatedDifficulty: "MEDIUM",
+      estimatedImpact: "HIGH",
+    };
+  }
+
+  // 4. Server Response Time (TTFB / Time to First Byte)
+  if (issueCode === "server-response-time" || issueCode === "time-to-first-byte" || issueCode === "ttfb") {
+    const isWp = techStack === "WORDPRESS" || techStack === "WOOCOMMERCE";
+    const isNext = techStack === "NEXTJS";
+    const snippet = isNext
+      ? `// Next.js App Router (app/page.tsx or route.ts)
+// 1. Enable Incremental Static Regeneration (ISR) to serve cached HTML from edge:
+export const revalidate = 3600; // Cache page for 1 hour at edge CDN
+
+// 2. In next.config.mjs:
+export default {
+  compress: true,
+  poweredByHeader: false,
+};`
+      : isWp
+      ? `# WordPress .htaccess / LiteSpeed / Nginx Server Response Optimization
+# 1. Enable LiteSpeed / WP Super Cache Full Page Caching
+# 2. Redis Object Cache in wp-config.php:
+define('WP_CACHE', true);
+define('WP_REDIS_HOST', '127.0.0.1');
+
+# 3. Apache/LiteSpeed Cache Headers for HTML:
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400"
+</IfModule>`
+      : `# Origin Server & CDN Cache Rule (Cloudflare / Fastly / Nginx)
+# Send modern Cache-Control headers for anonymous HTML requests:
+Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=86400
+
+# Nginx FastCGI / Proxy Cache:
+fastcgi_cache_path /var/cache/nginx levels=1:2 keys_zone=PAGECACHE:100m inactive=60m;
+fastcgi_cache PAGECACHE;
+fastcgi_cache_valid 200 301 302 60m;
+add_header X-Cache-Status $upstream_cache_status;`;
+
+    return {
+      detectedStack: techStack,
+      explanationMarketer: `Your web server takes too long to respond with the first piece of data${savingsNotice}. Every other asset (images, fonts, scripts) is delayed until the server answers. Faster servers make the whole site snap open.`,
+      explanationDeveloper: `High Time to First Byte (TTFB)${resourceNotice}. Root causes: uncached dynamic server rendering, slow database queries, lack of edge CDN caching, or remote origin hosting without geo-replication. Implement full-page edge caching (s-maxage) and database connection pooling.`,
+      explanationAgency: `Critical foundation. High TTFB ruins all downstream performance metrics (FCP, LCP). Caching the HTML at the CDN edge brings TTFB down from 1500ms to < 100ms.`,
+      explanationSaaSTeam: `Optimize server infrastructure and database indexing to hit the p75 TTFB SLA (< 800ms).`,
+      remediationCodeSnippet: `${contextHeader}${snippet}${flaggedListComment}`,
+      implementationSteps: [
+        "Deploy edge CDN caching (Cloudflare Cache Rules / Fastly / Vercel Edge) so anonymous visitors get cached HTML in < 150ms",
+        "Enable database connection pooling and add indexes to slow un-indexed SQL queries",
+        techStack === "NEXTJS"
+          ? "Switch heavy dynamic server components to ISR (export const revalidate = 60)"
+          : "Enable Redis Object Caching and full-page cache in your server stack",
+      ],
+      verificationSteps: [
+        "Run 'curl -I -o /dev/null -s -w 'TTFB: %{time_starttransfer}s\n' https://your-domain.com' and confirm < 0.3s",
+        "Re-run SpeedPilot audit to verify server-response-time passes",
+      ],
+      estimatedDifficulty: "MEDIUM",
+      estimatedImpact: "HIGH",
+    };
+  }
+
+  // 5. Text Compression (Gzip / Brotli)
+  if (issueCode === "uses-text-compression") {
+    const encoding = ctx?.responseHeaders?.contentEncoding;
+    return {
+      detectedStack: techStack,
+      explanationMarketer: `Text assets (HTML, CSS, JavaScript, and SVG) are being delivered without compression${savingsNotice}, using 4x more cellular data and slowing down downloads.`,
+      explanationDeveloper: `Assets are served with 'content-encoding: ${encoding || "none"}' instead of 'br' (Brotli) or 'gzip'${resourceNotice}. Brotli compresses text payloads 15-25% smaller than Gzip. Enable Brotli compression on your web server or CDN.`,
+      explanationAgency: `Zero-risk configuration change that immediately cuts total page weight by 50-70% and boosts FCP.`,
+      explanationSaaSTeam: `Bandwidth reduction and CDN egress cost optimization.`,
+      remediationCodeSnippet: `${contextHeader}# Nginx Configuration (/etc/nginx/nginx.conf):
+gzip on;
+gzip_comp_level 6;
+gzip_types text/plain text/css application/javascript application/json image/svg+xml application/xml;
+
+# Enable Brotli (if ngx_brotli module installed):
+brotli on;
+brotli_comp_level 6;
+brotli_types text/plain text/css application/javascript application/json image/svg+xml application/xml;
+
+# Apache (.htaccess) Configuration:
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json image/svg+xml
+</IfModule>${flaggedListComment}`,
+      implementationSteps: [
+        "Enable Gzip / Brotli compression in web server config (Nginx, Apache, or Caddy)",
+        "If using Cloudflare, go to Speed -> Optimization -> Brotli and ensure it is toggled ON",
+        techStack === "NEXTJS" ? "Ensure compress: true is enabled in next.config.mjs (default is true)" : "Verify mod_deflate is active in Apache",
+      ],
+      verificationSteps: [
+        "Inspect response headers in DevTools Network tab: verify 'Content-Encoding: br' or 'gzip'",
+        "Re-run SpeedPilot audit to confirm uses-text-compression passes",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    };
+  }
+
+  // 6. Network dependency tree / Preconnect / Preload / Prefetch hints
   if (
     issueCode === "network-dependency-tree-insight" ||
     issueCode === "uses-rel-preconnect" ||
     issueCode === "uses-rel-preload" ||
-    issueCode === "critical-request-chains" ||
-    issueCode === "third-party-summary"
+    issueCode === "critical-request-chains"
   ) {
     const preconnectTags = buildPreconnectSnippet(origins);
     const preloadTags = urls.length ? buildPreloadSnippet(urls) : `<link rel="preload" href="/css/critical.css" as="style">\n<link rel="preload" href="/fonts/main.woff2" as="font" type="font/woff2" crossorigin>`;
@@ -312,19 +545,50 @@ export function getDeterministicRecommendation(
     };
   }
 
-  // Font display / Webfont optimization (Lighthouse 13 font-display-insight)
+  // 7. Font display / Webfont optimization (Lighthouse 13 font-display-insight)
   if (issueCode === "font-display-insight" || issueCode === "font-display") {
     const fontUrls = urls.filter((u) => /\.(woff2?|ttf|otf)(\?|$)/i.test(u));
     const fontPreloads = fontUrls.length
       ? buildPreloadSnippet(fontUrls)
       : `<link rel="preload" href="/fonts/primary-400.woff2" as="font" type="font/woff2" crossorigin>`;
+    const isNext = techStack === "NEXTJS";
+    const snippet = isNext
+      ? `// Next.js: Self-host Google/Custom Fonts with next/font to eliminate FOIT & Layout Shift
+import { Inter } from 'next/font/google';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  preload: true,
+  fallback: ['system-ui', 'sans-serif'],
+});
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className={inter.className}>
+      <body>{children}</body>
+    </html>
+  );
+}`
+      : `<!-- 1. Preload primary WOFF2 font in <head> (crossorigin is required even on same origin) -->
+${fontPreloads}
+
+<!-- 2. Ensure font-display: swap in CSS @font-face (or &display=swap on Google Fonts) -->
+<style>
+@font-face {
+  font-family: 'PrimaryBrandFont';
+  src: url('${fontUrls[0] || "/fonts/primary-400.woff2"}') format('woff2');
+  font-display: swap;
+}
+</style>`;
+
     return {
       detectedStack: techStack,
       explanationMarketer: `Visitors see invisible text (Flash of Invisible Text) while custom fonts finish downloading${savingsNotice}. Showing a crisp fallback font immediately keeps users reading right away.`,
       explanationDeveloper: `Web fonts load without 'font-display: swap' or early preloading${resourceNotice}, hiding text until the font file finishes downloading.`,
       explanationAgency: `Quick CSS + <head> upgrade that eliminates blank-text delays and recovers ~100-300ms FCP.`,
       explanationSaaSTeam: `Standardize @font-face policies across design system typography tokens.`,
-      remediationCodeSnippet: `<!-- 1. Preload primary WOFF2 font in <head> (crossorigin is required even on same origin) -->\n${fontPreloads}\n\n<!-- 2. Ensure font-display: swap in CSS @font-face (or &display=swap on Google Fonts) -->\n<style>\n@font-face {\n  font-family: 'PrimaryBrandFont';\n  src: url('${fontUrls[0] || "/fonts/primary-400.woff2"}') format('woff2');\n  font-display: swap;\n}\n</style>${flaggedListComment}`,
+      remediationCodeSnippet: `${contextHeader}${snippet}${flaggedListComment}`,
       implementationSteps: [
         "Add font-display: swap; (or optional) inside every @font-face block in your stylesheet",
         "If using Google Fonts, confirm the URL ends with &display=swap",
@@ -339,7 +603,7 @@ export function getDeterministicRecommendation(
     };
   }
 
-  // Cache lifetimes (Lighthouse 13 cache-insight & uses-long-cache-ttl)
+  // 8. Cache lifetimes (Lighthouse 13 cache-insight & uses-long-cache-ttl)
   if (issueCode === "cache-insight" || issueCode === "uses-long-cache-ttl") {
     const originHeaderRules = firstParty.length
       ? isCloudflare
@@ -370,26 +634,105 @@ export function getDeterministicRecommendation(
     };
   }
 
-  // Modern image formats, responsive sizing & LCP image delivery
+  // 9. Modern image formats, responsive sizing & LCP image delivery
   if (
     issueCode === "modern-image-formats" ||
     issueCode === "uses-optimized-images" ||
     issueCode === "uses-responsive-images" ||
-    issueCode === "image-delivery-insight"
+    issueCode === "image-delivery-insight" ||
+    issueCode === "offscreen-images" ||
+    issueCode === "efficient-animated-content"
   ) {
     const imgTarget = primaryUrl || "/images/hero-banner.jpg";
-    const imgSelector = firstNode?.selector ? ` (${firstNode.selector})` : "";
+    const isNext = techStack === "NEXTJS";
+    const isWp = techStack === "WORDPRESS" || techStack === "WOOCOMMERCE";
+    const isShopify = techStack === "SHOPIFY";
+
+    let codeSnippet = "";
+    if (isNext) {
+      codeSnippet = `// Next.js: Modern Responsive Image with AVIF/WebP and automatic sizing
+import Image from 'next/image';
+
+export function ResponsiveHero() {
+  return (
+    <div className="relative w-full aspect-[16/9] overflow-hidden">
+      <Image
+        src="${imgTarget}"
+        alt="Descriptive hero image alt text"
+        fill
+        priority // Add priority ONLY if this is the above-the-fold LCP image!
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+        className="object-cover"
+      />
+    </div>
+  );
+}
+
+// In next.config.mjs:
+export default {
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 31536000,
+  },
+};`;
+    } else if (isWp) {
+      codeSnippet = `// WordPress Image Optimization (WebP / AVIF & Responsive Sizes)
+// 1. LiteSpeed Cache / WebP Express: Enable WebP Replacement in Admin -> Media
+// 2. Ensure responsive image generation in functions.php:
+add_theme_support('post-thumbnails');
+add_image_size('hero-desktop', 1440, 810, true);
+add_image_size('hero-mobile', 480, 270, true);
+
+<!-- Responsive HTML output -->
+<picture>
+  <source type="image/avif" srcset="/img/hero-mobile.avif 480w, /img/hero-desktop.avif 1440w" sizes="(max-width: 768px) 100vw, 1440px">
+  <source type="image/webp" srcset="/img/hero-mobile.webp 480w, /img/hero-desktop.webp 1440w" sizes="(max-width: 768px) 100vw, 1440px">
+  <img src="${imgTarget}" alt="Optimized Hero" width="1440" height="810" loading="lazy" decoding="async">
+</picture>`;
+    } else if (isShopify) {
+      codeSnippet = `<!-- Shopify Liquid: Serve modern responsive format with image_url filters -->
+{{ section.settings.image | image_url: width: 1440 | image_tag:
+  loading: 'lazy',
+  decoding: 'async',
+  widths: '375, 550, 750, 1100, 1440',
+  sizes: '(max-width: 768px) 100vw, 1440px',
+  alt: section.settings.image.alt | escape
+}}`;
+    } else {
+      codeSnippet = `<!-- Modern Responsive Picture Tag (AVIF + WebP fallback) -->
+<picture>
+  <source
+    type="image/avif"
+    srcset="/img/hero-480.avif 480w, /img/hero-960.avif 960w, /img/hero-1440.avif 1440w"
+    sizes="(max-width: 768px) 100vw, 1200px"
+  />
+  <source
+    type="image/webp"
+    srcset="/img/hero-480.webp 480w, /img/hero-960.webp 960w, /img/hero-1440.webp 1440w"
+    sizes="(max-width: 768px) 100vw, 1200px"
+  />
+  <img
+    src="${imgTarget}"
+    alt="Descriptive alt text"
+    width="1200"
+    height="675"
+    loading="lazy"
+    decoding="async"
+  />
+</picture>`;
+    }
+
     return {
       detectedStack: techStack,
       explanationMarketer: `Images on the page are larger than needed or stored in older formats (PNG/JPEG) instead of modern WebP/AVIF${savingsNotice}. Shrinking them makes pages snap open on mobile.`,
-      explanationDeveloper: `Oversized or unoptimized raster images${resourceNotice}${imgSelector} increase network payload. Serve appropriately sized WebP/AVIF versions with srcset, explicit width/height, and lazy-load offscreen images.`,
+      explanationDeveloper: `Oversized or unoptimized raster images${resourceNotice} increase network payload. Serve appropriately sized WebP/AVIF versions with srcset, explicit width/height, and lazy-load offscreen images.`,
       explanationAgency: `Quick win for client sites. Compressing and modernizing images frequently cuts page weight by 50-80%.`,
       explanationSaaSTeam: `Bandwidth reduction and CDN egress cost optimization.`,
-      remediationCodeSnippet: `<!-- Responsive Modern Image (replace ${imgTarget}) -->\n<picture>\n  <source\n    type="image/avif"\n    srcset="/img/hero-480.avif 480w, /img/hero-960.avif 960w, /img/hero-1440.avif 1440w"\n    sizes="(max-width: 768px) 100vw, 1200px"\n  />\n  <source\n    type="image/webp"\n    srcset="/img/hero-480.webp 480w, /img/hero-960.webp 960w, /img/hero-1440.webp 1440w"\n    sizes="(max-width: 768px) 100vw, 1200px"\n  />\n  <img\n    src="${imgTarget}"\n    alt="Descriptive alt text"\n    width="1200"\n    height="675"\n    loading="lazy"\n    decoding="async"\n  />\n</picture>${firstNode?.snippet ? `\n<!-- Flagged DOM element:\n${firstNode.snippet}\n-->` : ""}${flaggedListComment}`,
+      remediationCodeSnippet: `${contextHeader}${codeSnippet}${firstNode?.snippet ? `\n<!-- Flagged DOM element:\n${firstNode.snippet}\n-->` : ""}${flaggedListComment}`,
       implementationSteps: [
         "Batch convert existing JPEG/PNG assets to WebP/AVIF format",
         "Implement <picture> element or modern image component with width/height attributes to prevent CLS",
-        "Add loading='lazy' attribute to below-the-fold images",
+        "Add loading='lazy' attribute to below-the-fold images (keep loading='eager' ONLY on the above-the-fold hero image)",
       ],
       verificationSteps: [
         "Check network tab to confirm images transfer in WebP/AVIF format",
@@ -400,114 +743,60 @@ export function getDeterministicRecommendation(
     };
   }
 
-  // Agentic Browsing - WebMCP Schemas
-  if (issueCode === "webmcp-schema" || issueCode === "agentic-browsing" || issueCode === "webmcp") {
-    return {
-      detectedStack: techStack,
-      explanationMarketer: `Autonomous AI agents (such as Google Gemini, ChatGPT, and Claude Agentic Browsers) need structured declarations to navigate forms, search features, and transactional flows without breaking.`,
-      explanationDeveloper: `WebMCP (Web Model Context Protocol) defines structured schema metadata in <head> or JSON-LD so AI browsing agents understand page actions, parameters, and executable form endpoints deterministically.`,
-      explanationAgency: `Future-proof client visibility in Google AI Overviews and agentic search engines. Ensuring WebMCP compliance makes client websites directly operable by agentic shopping and booking assistants.`,
-      explanationSaaSTeam: `Prevents automated agent bot failures and improves conversion from next-generation AI referrals.`,
-      remediationCodeSnippet: `<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "WebSite",\n  "name": "SiteName",\n  "potentialAction": {\n    "@type": "SearchAction",\n    "target": "https://example.com/search?q={query}",\n    "query-input": "required name=query"\n  }\n}\n</script>`,
-      implementationSteps: [
-        "Embed standard Schema.org Action definitions (SearchAction, ReserveAction, BuyAction) in <head>",
-        "Verify all interactive buttons and inputs have clear, unambiguous 'name' and 'id' attributes",
-        "Publish an /llms.txt file at domain root outlining key markdown API endpoints for AI crawlers",
-      ],
-      verificationSteps: [
-        "Verify schema in Google Rich Results Test",
-        "Run SpeedPilot Agentic Browsing audit to confirm WebMCP status",
-      ],
-      estimatedDifficulty: "EASY",
-      estimatedImpact: "HIGH",
-    };
-  }
-
-  // Agentic Browsing - Accessibility Tree Well-Formed
-  if (issueCode === "accessibility-tree" || issueCode === "accessibility-tree-well-formed") {
-    return {
-      detectedStack: techStack,
-      explanationMarketer: `AI agents browse websites using the accessibility tree rather than visual pixels. An unformed accessibility tree causes AI agents to fail when trying to read or click elements.`,
-      explanationDeveloper: `The Chromium accessibility tree is degraded due to missing ARIA labels, orphan interactive tags, or unlabeled form inputs. AI agents parse the AOM (Accessibility Object Model) to locate interactable targets.`,
-      explanationAgency: `Dual benefit: solves both WCAG 2.1 ADA compliance requirements and enables full compatibility with modern Google Agentic Browsing.`,
-      explanationSaaSTeam: `Eliminates automated accessibility litigation exposure and ensures AI-assisted users and agents can complete signups.`,
-      remediationCodeSnippet: `<!-- Before: Unlabeled button and icon -->\n<button onclick="openMenu()"><svg>...</svg></button>\n\n<!-- Recommended Fix: Accessible name and ARIA semantics -->\n<button aria-label="Open Navigation Menu" title="Open Navigation Menu" onclick="openMenu()">\n  <svg aria-hidden="true" focusable="false">...</svg>\n</button>`,
-      implementationSteps: [
-        "Audit all icon-only buttons (<button><svg/></button>) and add 'aria-label' or visually hidden span text",
-        "Ensure all <select> and <input> fields have associated <label for='...'> tags",
-        "Ensure heading levels (h1 -> h2 -> h3) maintain logical hierarchical nesting without skipping levels",
-      ],
-      verificationSteps: [
-        "Inspect elements in Chrome DevTools Accessibility pane to confirm accessible name is calculated",
-        "Run SpeedPilot Agentic Browsing check to verify tree pass",
-      ],
-      estimatedDifficulty: "EASY",
-      estimatedImpact: "HIGH",
-    };
-  }
-
-  // Link discernible name & descriptive anchor text
-  if (issueCode === "link-name" || issueCode === "link-text") {
-    const flaggedSnippet = firstNode?.snippet ? `\n<!-- Flagged anchor element in your DOM -->\n${firstNode.snippet}` : "";
-    return {
-      detectedStack: techStack,
-      explanationMarketer: `Links on the page lack clear or descriptive text (like icon-only links or vague "click here" / "learn more" labels). Visitors, screen readers, and Google crawlers cannot tell where the link goes.`,
-      explanationDeveloper: `<a> anchor tags lack discernible text content, descriptive wording, or 'aria-label'${firstNode?.selector ? ` at selector '${firstNode.selector}'` : ""}. Replace generic phrases ("click here", "read more") or empty icons with clear text.`,
-      explanationAgency: `Fundamental SEO and accessibility requirement. Every link must explicitly state its destination for humans and search crawlers.`,
-      explanationSaaSTeam: `Prevents crawler dead-ends and ensures complete sitemap traversal.`,
-      remediationCodeSnippet: `<!-- Before: Empty icon link or vague text -->\n<a href="/pricing">Read more</a>\n\n<!-- Recommended Fix: Descriptive label & accessible icon -->\n<a href="/pricing" aria-label="View SpeedPilot Pricing Plans">\n  Explore Pricing Plans\n</a>${flaggedSnippet}`,
-      implementationSteps: [
-        "Replace vague anchor text ('click here', 'read more') with the actual destination topic",
-        "Add explicit 'aria-label' to icon-only links and set aria-hidden='true' on decorative SVG/icon tags",
-      ],
-      verificationSteps: [
-        "Run SpeedPilot audit and verify 0 link-name warnings",
-      ],
-      estimatedDifficulty: "EASY",
-      estimatedImpact: "HIGH",
-    };
-  }
-
-  // Button discernible name
-  if (issueCode === "button-name") {
-    return {
-      detectedStack: techStack,
-      explanationMarketer: `Interactive buttons lack labels (e.g. search triggers, cart toggles, mobile hamburger menus). AI agents cannot identify which action to take.`,
-      explanationDeveloper: `<button> elements must have inner text, an 'aria-label', or an 'aria-labelledby' attribute that supplies an accessible name to the browser accessibility tree.`,
-      explanationAgency: `Standard UX and ADA compliance fix. Prevents user and agent bounce on mobile navigation.`,
-      explanationSaaSTeam: `Ensures automated end-to-end testing agents and AI browser helpers can interact with button elements reliably.`,
-      remediationCodeSnippet: `<!-- Before -->\n<button class="search-btn"><svg>...</svg></button>\n\n<!-- Recommended Fix -->\n<button class="search-btn" aria-label="Search Catalog" type="button">\n  <svg aria-hidden="true">...</svg>\n</button>`,
-      implementationSteps: [
-        "Add aria-label to all icon buttons in global navigation and search bars",
-        "Set type='button' explicitly on non-submit buttons to avoid form misfire",
-      ],
-      verificationSteps: [
-        "Run SpeedPilot audit and verify button-name check passes",
-      ],
-      estimatedDifficulty: "EASY",
-      estimatedImpact: "HIGH",
-    };
-  }
-
-  // Largest Contentful Paint (LCP) & Lighthouse 13 lcp-breakdown-insight
+  // 10. Largest Contentful Paint (LCP) & Lighthouse 13 lcp-breakdown-insight
   if (
     issueCode === "largest-contentful-paint" ||
+    issueCode === "largest-contentful-paint-element" ||
     issueCode === "lcp-breakdown-insight" ||
     issueCode === "prioritize-lcp-image" ||
     issueCode === "lcp"
   ) {
     const lcpHref = primaryUrl || "/hero-banner.webp";
+    const isNext = techStack === "NEXTJS";
+    const snippet = isNext
+      ? `// Next.js: Fix LCP on hero image in app/page.tsx
+import Image from 'next/image';
+
+export function HeroSection() {
+  return (
+    <div className="relative w-full h-[500px]">
+      <Image
+        src="${lcpHref}"
+        alt="Hero banner"
+        fill
+        priority // Crucial: forces high fetchpriority and injects <link rel="preload"> in <head>
+        fetchPriority="high"
+        sizes="100vw"
+        className="object-cover"
+      />
+    </div>
+  );
+}`
+      : `<!-- 1. In HTML <head>: High-Priority Preload LCP Asset -->
+<link rel="preload" as="image" href="${lcpHref}" fetchpriority="high">
+
+<!-- 2. On your Hero / LCP <img> Tag: NEVER lazy-load above the fold -->
+<img
+  src="${lcpHref}"
+  alt="Hero"
+  fetchpriority="high"
+  loading="eager"
+  decoding="async"
+  width="1200"
+  height="600"
+>`;
+
     return {
       detectedStack: techStack,
       explanationMarketer: `The largest visual element on the page (usually your hero image or main headline) takes too long to appear${savingsNotice}. Speeding this up makes the site feel instant and boosts Google rankings.`,
       explanationDeveloper: `LCP element suffers from high TTFB, resource load delay, or render delay${resourceNotice}${firstNode?.selector ? ` (${firstNode.selector})` : ""}. Preload the LCP asset in <head> with fetchpriority="high" and never apply loading="lazy" to above-the-fold hero media.`,
       explanationAgency: `Google Core Web Vitals ranking factor. Keeping LCP under 2.5 seconds passes the official search ranking threshold.`,
       explanationSaaSTeam: `Critical conversion metric. B2B and e-commerce conversions jump when LCP is under 2.0s.`,
-      remediationCodeSnippet: `<!-- In HTML <head>: Priority Preload LCP Asset -->\n<link rel="preload" as="image" href="${lcpHref}" fetchpriority="high">\n\n<!-- On your Hero / LCP <img> Tag (never lazy-load above the fold) -->\n<img src="${lcpHref}" alt="Hero" fetchpriority="high" loading="eager" decoding="async" width="1200" height="600">${firstNode?.snippet ? `\n<!-- Flagged LCP node:\n${firstNode.snippet}\n-->` : ""}${flaggedListComment}`,
+      remediationCodeSnippet: `${contextHeader}${snippet}${firstNode?.snippet ? `\n<!-- Flagged LCP node:\n${firstNode.snippet}\n-->` : ""}${flaggedListComment}`,
       implementationSteps: [
         "Identify the LCP node in audit evidence (hero image or primary heading)",
         `Add <link rel="preload" as="image" href="${lcpHref}" fetchpriority="high"> in <head>`,
-        "Set loading='eager' and fetchpriority='high' directly on the hero <img> tag",
+        "Set loading='eager' and fetchpriority='high' directly on the hero <img> tag (remove loading='lazy')",
         "Serve the LCP image in WebP/AVIF from a fast CDN",
       ],
       verificationSteps: [
@@ -519,15 +808,31 @@ export function getDeterministicRecommendation(
     };
   }
 
-  // Cumulative Layout Shift (CLS)
-  if (issueCode === "cumulative-layout-shift" || issueCode === "layout-shifts" || issueCode === "cls") {
+  // 11. Cumulative Layout Shift (CLS)
+  if (issueCode === "cumulative-layout-shift" || issueCode === "layout-shifts" || issueCode === "layout-shift-elements" || issueCode === "cls") {
     return {
       detectedStack: techStack,
       explanationMarketer: `Elements jump around unexpectedly while the page loads (like banners or images popping in late). This frustrates users and causes accidental misclicks.`,
-      explanationDeveloper: `Images, ads, or dynamic iframes render without explicit width and height aspect ratios, causing browser reflows when resources finish loading.`,
+      explanationDeveloper: `Images, ads, or dynamic iframes render without explicit width and height aspect ratios, causing browser reflows when resources finish loading. Reserve dimensional boxes via CSS aspect-ratio or contain-intrinsic-size.`,
       explanationAgency: `Easy Core Web Vitals win. Eliminating layout shifts brings CLS to ≤ 0.05, well within Google's 'Good' threshold.`,
       explanationSaaSTeam: `Fixes jarring visual glitches during landing page customer onboarding.`,
-      remediationCodeSnippet: `/* CSS Aspect Ratio Reservation */\n.hero-image-wrapper {\n  aspect-ratio: 16 / 9;\n  width: 100%;\n  background-color: #f4f4f5;\n}\n\n<!-- Reserve Dimensions in HTML -->\n<img src="/banner.webp" width="1200" height="675" style="width:100%; height:auto;" alt="Banner">`,
+      remediationCodeSnippet: `/* 1. CSS Aspect Ratio Container Reservation */
+.hero-image-wrapper {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  background-color: #f4f4f5; /* Lightweight placeholder prevents jarring shift */
+}
+
+/* 2. Dynamic Ad or Banner Container Reservation */
+.ad-slot-placeholder {
+  min-height: 250px;
+  width: 100%;
+  display: block;
+}
+
+<!-- 3. Explicit Dimensions in HTML Elements -->
+<img src="${primaryUrl || "/banner.webp"}" width="1200" height="675" style="width:100%; height:auto;" alt="Banner">
+${firstNode?.snippet ? `\n<!-- Flagged Shift Element:\n${firstNode.snippet}\n-->` : ""}`,
       implementationSteps: [
         "Add explicit width and height attributes to all <img>, <video>, and <iframe> elements",
         "Use CSS aspect-ratio or min-height placeholders for dynamically injected ads or banners",
@@ -541,17 +846,17 @@ export function getDeterministicRecommendation(
     };
   }
 
-  // Unused JavaScript / Code-Splitting & Unused/Unminified CSS/JS
-  if (issueCode === "unused-javascript") {
+  // 12. Unused JavaScript / Code-Splitting
+  if (issueCode === "unused-javascript" || issueCode === "duplicated-javascript") {
     const jsList = urls.slice(0, 4);
     const thirdPartyNote = thirdParty.length
-      ? `\n\n<!-- 3rd-party scripts (${thirdParty.length}) -> Load lazily or via Partytown / after interaction -->\n${thirdParty.slice(0, 3).map((u) => `<script src="${u}" defer></script>`).join("\n")}`
+      ? `\n\n<!-- 3rd-party scripts (${thirdParty.length}) -> Load lazily or after user interaction -->\n${thirdParty.slice(0, 3).map((u) => `<script src="${u}" defer></script>`).join("\n")}`
       : "";
     const firstPartyFix =
       isLiteSpeed
         ? `/* LiteSpeed Cache Detected: Page Optimization -> JS Settings:\n   - Enable 'Load JS Deferred' (Delayed) to stop unused JS from blocking initial paint */\n`
         : techStack === "NEXTJS"
-        ? `// Next.js: Dynamic-import heavy client components & use next/script strategy="lazyOnload"\nimport dynamic from 'next/dynamic';\nimport Script from 'next/script';\nconst DeferredWidget = dynamic(() => import('@/components/Widget'), { ssr: false });\n`
+        ? `// Next.js: Dynamic-import heavy client components & use next/script strategy="lazyOnload"\nimport dynamic from 'next/dynamic';\nimport Script from 'next/script';\n\n// Defer heavy modal, chart, or rich-text editor components until rendered:\nconst HeavyChart = dynamic(() => import('@/components/HeavyChart'), {\n  ssr: false,\n  loading: () => <div className="h-64 animate-pulse bg-muted rounded" />,\n});\n`
         : "";
     const jsDeferTags = firstParty.length
       ? firstParty.slice(0, 3).map((u) => `<script src="${u}" defer></script>`).join("\n")
@@ -563,7 +868,7 @@ export function getDeterministicRecommendation(
       explanationDeveloper: `Found ${firstParty.length} first-party and ${thirdParty.length} third-party scripts with dead/unexecuted code${resourceNotice}. Split non-essential widgets with dynamic import() and defer or delay third-party pixels/chat embeds.`,
       explanationAgency: `Cuts initial JS weight and lowers Interaction to Next Paint (INP) & Total Blocking Time (TBT).`,
       explanationSaaSTeam: `Reduces script parse/compile time on mid-tier Android devices.`,
-      remediationCodeSnippet: `${contextHeader}${firstPartyFix}${jsDeferTags}${thirdPartyNote}${flaggedListComment}`,
+      remediationCodeSnippet: `${contextHeader}${firstPartyFix}${jsDeferTags}${thirdPartyNote}${flaggedListComment}${vendorSnippet}`,
       implementationSteps: [
         `Inspect flagged bundles (${jsList.join(", ") || "bundle.js"}) and remove unused libraries/plugins`,
         techStack === "NEXTJS"
@@ -580,6 +885,7 @@ export function getDeterministicRecommendation(
     };
   }
 
+  // 13. Unused/Unminified CSS
   if (issueCode === "unused-css-rules" || issueCode === "unminified-css" || issueCode === "unminified-javascript") {
     const isCss = issueCode !== "unminified-javascript";
     const cssNote = isLiteSpeed
@@ -609,82 +915,64 @@ export function getDeterministicRecommendation(
     };
   }
 
-  if (
-    issueCode === "uses-text-compression" ||
-    issueCode === "server-response-time" ||
-    issueCode === "dom-size" ||
-    issueCode === "total-byte-weight"
-  ) {
-    const encoding = ctx?.responseHeaders?.contentEncoding;
-    const isCompression = issueCode === "uses-text-compression";
-    const isTtfb = issueCode === "server-response-time";
+  // 14. DOM Size / Excessive DOM
+  if (issueCode === "dom-size" || issueCode === "excessive-dom-size") {
     return {
       detectedStack: techStack,
-      explanationMarketer: isTtfb
-        ? `Your web server takes too long to send the very first HTML byte${savingsNotice}, delaying everything else on the page.`
-        : isCompression
-        ? `Text files (HTML/CSS/JS) are sent uncompressed instead of using Brotli or Gzip${savingsNotice}.`
-        : `The page contains too many HTML DOM nodes or total megabytes${savingsNotice}, slowing down mobile browser rendering.`,
-      explanationDeveloper: isTtfb
-        ? `Slow origin TTFB${resourceNotice}. Enable full-page HTML caching (LiteSpeed Cache / Cloudflare APO / Next.js ISR) and optimize slow database queries.`
-        : isCompression
-        ? `Detected content-encoding=${encoding || "none"}. Enable Brotli ('br') with Gzip fallback on Nginx/Apache/Cloudflare.`
-        : `Trim deeply nested page-builder wrappers, paginate long lists, and lazy-load offscreen media/iframes.`,
-      explanationAgency: `Solves root server/network bottlenecks before optimizing micro-assets.`,
-      explanationSaaSTeam: `Protects Core Web Vitals TTFB (< 800ms) and mobile memory budgets.`,
-      remediationCodeSnippet: isCompression
-        ? `${contextHeader}# Enable Brotli & Gzip compression (Nginx)\ngzip on;\ngzip_types text/plain text/css application/javascript application/json image/svg+xml;\nbrotli on;\nbrotli_types text/plain text/css application/javascript application/json image/svg+xml;${flaggedListComment}`
-        : isTtfb
-        ? `${contextHeader}# Recommended TTFB Headers (Edge CDN / Origin Cache)\nCache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=86400${flaggedListComment}`
-        : `${contextHeader}<!-- Keep total DOM under ~1,400 nodes: paginate feeds & avoid hidden offscreen popups -->${flaggedListComment}`,
-      implementationSteps: isTtfb
-        ? ["Enable server/CDN page caching so anonymous visitors hit memory/edge cache in < 200ms", "Profile slow database queries or plugins on uncached requests"]
-        : ["Enable Brotli/Gzip text compression on origin server or CDN", "Reduce oversized DOM containers and total payload weight"],
-      verificationSteps: ["Re-run SpeedPilot audit and confirm TTFB / Compression / Byte Weight metrics pass"],
+      explanationMarketer: `The page contains too many HTML elements (over 800 nodes)${savingsNotice}. Mobile phones struggle to calculate layout and scroll smoothly with deep, bloated page trees.`,
+      explanationDeveloper: `Excessive DOM depth increases memory consumption, style recalculation duration, and paint overhead. Use virtual scrolling for large lists, paginate heavy product/table feeds, and apply 'content-visibility: auto' to offscreen sections.`,
+      explanationAgency: `Noticeable smoothness lift on mobile devices. Reduces DOM memory footprint by 40-60%.`,
+      explanationSaaSTeam: `Enforce DOM node budget in CI and implement windowing on data tables.`,
+      remediationCodeSnippet: `/* CSS content-visibility: auto skips layout/paint of offscreen sections */
+.below-fold-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px; /* Estimates height so scrollbar doesn't jump */
+}
+
+// In React / Next.js: Use virtualization for lists with > 50 items:
+// npm install @tanstack/react-virtual
+import { useVirtualizer } from '@tanstack/react-virtual';`,
+      implementationSteps: [
+        "Apply CSS 'content-visibility: auto' and 'contain-intrinsic-size' to footer and below-the-fold sections",
+        "Paginate long feeds or use @tanstack/react-virtual for lists and tables",
+        "Strip extraneous wrapper <div> containers generated by WYSIWYG or visual page builders",
+      ],
+      verificationSteps: ["Run SpeedPilot audit and verify total DOM node count is < 800"],
       estimatedDifficulty: "MEDIUM",
       estimatedImpact: "HIGH",
     };
   }
 
-  // Legacy JavaScript, Bootup Time & Forced Reflow (Lighthouse 13)
-  if (
-    issueCode === "legacy-javascript-insight" ||
-    issueCode === "legacy-javascript" ||
-    issueCode === "bootup-time" ||
-    issueCode === "forced-reflow-insight"
-  ) {
-    const isReflow = issueCode === "forced-reflow-insight";
+  // 15. Redirects
+  if (issueCode === "redirects") {
     return {
       detectedStack: techStack,
-      explanationMarketer: isReflow
-        ? `Scripts are forcing the browser to repeatedly recalculate page layout${savingsNotice}, making scrolling and taps feel sluggish.`
-        : `Your site ships old JavaScript polyfills meant for outdated browsers${savingsNotice}, slowing down downloads and phone CPUs.`,
-      explanationDeveloper: isReflow
-        ? `JavaScript reads geometric layout properties (offsetHeight, getBoundingClientRect) immediately after mutating DOM styles, triggering synchronous layout thrashing${resourceNotice}. Batch DOM reads before writes.`
-        : `Scripts are compiled for ES5/legacy browsers with unnecessary polyfills${resourceNotice}. Target modern ES2020+ browsers in browserslist and load scripts with type="module" or defer.`,
-      explanationAgency: `Directly lowers Total Blocking Time (TBT) and improves Interaction to Next Paint (INP).`,
-      explanationSaaSTeam: `Eliminates main-thread stutter and polyfill bloat.`,
-      remediationCodeSnippet: isReflow
-        ? `// Batch DOM reads first, then schedule writes in requestAnimationFrame\nconst height = card.getBoundingClientRect().height;\nrequestAnimationFrame(() => {\n  card.style.minHeight = height + 'px';\n});${flaggedListComment}`
-        : `<!-- Serve modern ES modules & target modern browsers in package.json -->\n<script type="module" src="${primaryUrl || "/assets/app.mjs"}"></script>\n\n// package.json\n"browserslist": ["defaults", "not IE 11", "maintained node versions"]${flaggedListComment}`,
-      implementationSteps: isReflow
-        ? [
-            "Read layout measurements (offsetWidth, getBoundingClientRect) before writing inline styles or classes",
-            "Wrap visual DOM style updates inside requestAnimationFrame()",
-          ]
-        : [
-            "Update your build targets / browserslist to exclude IE11 and legacy polyfills",
-            "Split large third-party scripts with defer or dynamic import()",
-          ],
-      verificationSteps: [
-        "Verify Total Blocking Time (TBT) and INP improve in SpeedPilot",
+      explanationMarketer: `Visitors are bounced through multiple redirect hops before landing on the final page${savingsNotice}. Each hop adds 200-500ms of lag on mobile networks.`,
+      explanationDeveloper: `Avoid multi-hop redirect chains (e.g. http -> https -> www -> non-www -> trailing slash). Update all internal links to the final canonical destination URL directly.`,
+      explanationAgency: `Immediate 200-600ms latency reduction by removing unnecessary redirect hops.`,
+      explanationSaaSTeam: `Eliminate redirect chains in ingress routing rules and internal site links.`,
+      remediationCodeSnippet: `# 1. Update internal navigation links directly to the canonical URL:
+# Replace: href="http://example.com/page"
+# With:    href="https://example.com/page/"
+
+# 2. In Nginx: Single-hop 301 redirect combining HTTP -> HTTPS and WWW canonicalization:
+server {
+  listen 80;
+  listen 443 ssl;
+  server_name www.example.com;
+  return 301 https://example.com$request_uri;
+}`,
+      implementationSteps: [
+        "Audit internal menu and footer links to ensure they point directly to the final canonical HTTPS URL",
+        "Consolidate server redirects into a single step rather than cascading hops",
       ],
-      estimatedDifficulty: "MEDIUM",
-      estimatedImpact: "MEDIUM",
+      verificationSteps: ["Run 'curl -ILs https://your-url.com | grep HTTP/' to confirm only 1 final 200 OK"],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
     };
   }
 
-  // Accessibility & Web Coding Standards (color-contrast, meta-viewport, landmarks, headings, alt, SEO meta)
+  // 16. Accessibility & Web Standards
   if (issueCode === "color-contrast") {
     return {
       detectedStack: techStack,
@@ -758,22 +1046,37 @@ export function getDeterministicRecommendation(
     };
   }
 
-  // Default fallback for any other diagnostic issue
+  // 17. Default fallback for any other diagnostic issue (Smart, non-generic)
   const fallbackTargets = urls.slice(0, 3);
+  let fallbackSnippet = "";
+  if (detectedVendors.length > 0) {
+    fallbackSnippet = getVendorFixSnippet(detectedVendors, techStack);
+  } else if (fallbackTargets.length > 0) {
+    const isScript = fallbackTargets.some((u) => u.includes(".js"));
+    const isStyle = fallbackTargets.some((u) => u.includes(".css"));
+    if (isScript) {
+      fallbackSnippet = `<!-- Defer or dynamically import flagged JavaScript assets -->\n${fallbackTargets.map((u) => `<script src="${u}" defer></script>`).join("\n")}`;
+    } else if (isStyle) {
+      fallbackSnippet = `<!-- Preload critical stylesheet and load asynchronously -->\n${buildPreloadSnippet(fallbackTargets)}`;
+    } else {
+      fallbackSnippet = buildPreloadSnippet(fallbackTargets);
+    }
+  } else if (firstNode?.snippet) {
+    fallbackSnippet = `<!-- Flagged DOM element to fix (${firstNode.selector || issueCode}) -->\n${firstNode.snippet}`;
+  } else {
+    fallbackSnippet = `// Configure optimized resource delivery for '${issueCode}'\n// Ensure asset is minified, compressed with Brotli, and cached at CDN edge`;
+  }
+
   return {
     detectedStack: techStack,
     explanationMarketer: `SpeedPilot identified an opportunity to optimize '${issueCode}'${savingsNotice}. Resolving this issue improves user responsiveness, coding compliance, and site speed.`,
-    explanationDeveloper: `Lighthouse diagnostic flagged '${issueCode}'${resourceNotice}${firstNode?.selector ? ` at selector '${firstNode.selector}'` : ""}. Inspect the flagged resources, apply preloading/caching where applicable, and verify coding standards.`,
+    explanationDeveloper: `Lighthouse diagnostic flagged '${issueCode}'${resourceNotice}${firstNode?.selector ? ` at selector '${firstNode.selector}'` : ""}. Inspect the flagged resources, apply non-blocking loading strategies, and verify coding standards.`,
     explanationAgency: `Recommended optimization to include in client performance roadmap.`,
     explanationSaaSTeam: `Monitor metric regression in continuous delivery pipeline.`,
-    remediationCodeSnippet: fallbackTargets.length
-      ? `<!-- Preload critical assets / add Cache-Control or async defer for flagged files -->\n${buildPreloadSnippet(fallbackTargets)}${firstNode?.snippet ? `\n<!-- Flagged element:\n${firstNode.snippet}\n-->` : ""}`
-      : firstNode?.snippet
-        ? `<!-- Flagged DOM element to fix (${firstNode.selector || issueCode}) -->\n${firstNode.snippet}`
-        : `// Review offending resource configuration for '${issueCode}' and optimize loading strategy`,
+    remediationCodeSnippet: `${contextHeader}${fallbackSnippet}${firstNode?.snippet && !fallbackSnippet.includes(firstNode.snippet) ? `\n<!-- Flagged DOM node:\n${firstNode.snippet}\n-->` : ""}${flaggedListComment}`,
     implementationSteps: [
       `Inspect the specific flagged resources: ${fallbackTargets.length ? fallbackTargets.join(", ") : issueCode}`,
-      "Defer non-critical scripts, preload above-the-fold assets, and verify caching headers",
+      "Apply non-blocking loading, modern compression, and CDN caching",
     ],
     verificationSteps: [
       "Run SpeedPilot audit to verify resolution",
@@ -782,4 +1085,3 @@ export function getDeterministicRecommendation(
     estimatedImpact: "MEDIUM",
   };
 }
-

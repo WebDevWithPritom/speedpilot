@@ -4,7 +4,7 @@ import { PageSpeedClient } from "@speedpilot/pagespeed";
 import { crawlAndInspectSEO } from "@speedpilot/seo-engine";
 import { generateAIFixRecommendation, computeIssueSignature } from "@speedpilot/ai-engine";
 
-const defaultPsiClient = new PageSpeedClient();
+const defaultPsiClient = new PageSpeedClient({ timeoutMs: 12_000 });
 
 export interface CustomAuditKeys {
   googleKey?: string;
@@ -29,7 +29,7 @@ export async function executeAuditAsync(
     });
 
     const activeClient = customKeys?.googleKey
-      ? new PageSpeedClient({ apiKey: customKeys.googleKey })
+      ? new PageSpeedClient({ apiKey: customKeys.googleKey, timeoutMs: 12_000 })
       : defaultPsiClient;
 
     // Run PSI Audit and Technical SEO Crawl concurrently

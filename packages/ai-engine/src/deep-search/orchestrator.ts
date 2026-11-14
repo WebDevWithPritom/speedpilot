@@ -107,53 +107,60 @@ async function runLiveAIDeepSearch(
   agency?: AgencyDeepSearchResult;
   saasTeam?: SaaSTeamDeepSearchResult;
 }> {
-  const prompt = `You are SpeedPilot's Multi-Persona AI Deep Search Engine.
-Perform a deep search investigation on this PageSpeed audit issue for:
+  const prompt = `You are SpeedPilot's Principal Multi-Persona AI Deep Search Engine.
+Perform an exhaustive deep search investigation on this Google PageSpeed audit issue.
+
 Target URL: ${req.targetUrl}
 Tech Stack: ${req.techStack}
-Issue: ${JSON.stringify(req.issue)}
+Issue Evidence: ${JSON.stringify(req.issue)}
+
+STRICT ANTI-GENERIC REQUIREMENTS:
+1. developer: remediationDiff MUST contain an ACTUAL before-and-after code diff targeting the real flagged file/URL/selector in the audit for ${req.techStack}. bundlerConfigPatch must be real configuration code (e.g. next.config.mjs, vite.config.ts, or nginx.conf). cliVerificationCommand must be an executable terminal command.
+2. marketer: Calculate realistic bounce probability delta and conversion uplift based on mobile network benchmarks. State the exact competitor gap.
+3. agency: Provide a real 4-step Work Breakdown Structure with hours and client deliverables for a high-ROI sprint.
+4. saasTeam: Provide an exact lighthouserc.json performance budget assertion rule and Jira/Linear sprint ticket.
 
 Return a strict JSON object with 4 specialized keys:
 {
   "developer": {
     "persona": "DEVELOPER",
     "detectedStack": "${req.techStack}",
-    "rootCauseAnalysis": "Technical AST and browser pipeline analysis",
-    "offendingResource": "Resource URL",
-    "remediationDiff": "Before/after code patch",
-    "bundlerConfigPatch": "Bundler or server config",
-    "cliVerificationCommand": "Command to verify",
-    "recommendedPackages": ["package1"],
+    "rootCauseAnalysis": "Precise browser pipeline and DOM/AST breakdown naming the offending resource",
+    "offendingResource": "Flagged URL or selector",
+    "remediationDiff": "Exact working before/after code diff",
+    "bundlerConfigPatch": "Production bundler or server config block",
+    "cliVerificationCommand": "Working terminal command to verify fix",
+    "recommendedPackages": ["exact-npm-package"],
     "estimatedDevMinutes": 45
   },
   "marketer": {
     "persona": "MARKETER",
     "serpRankRisk": "HIGH" | "MEDIUM" | "LOW",
-    "projectedBounceRateDelta": "-X% bounce probability",
-    "estimatedConversionUplift": "+X% conversion",
-    "plainEnglishSummary": "Business impact summary",
-    "executiveBulletPoints": ["Point 1", "Point 2"],
-    "competitorGapNotice": "Competitor insight"
+    "projectedBounceRateDelta": "-X% bounce probability reduction",
+    "estimatedConversionUplift": "+X% conversion increase",
+    "plainEnglishSummary": "Business impact summary without tech jargon",
+    "executiveBulletPoints": ["Point 1", "Point 2", "Point 3"],
+    "competitorGapNotice": "Benchmark competitor comparison"
   },
   "agency": {
     "persona": "AGENCY",
-    "clientPitchNarrative": "Client deck pitch",
-    "projectedScoreLift": "+X points",
-    "workBreakdownStructure": [{"task": "Task name", "estimatedHours": 2, "priority": "QUICK_WIN"}],
+    "clientPitchNarrative": "Client deck pitch emphasizing ROI and score gains",
+    "projectedScoreLift": "+X to +Y points on Mobile PageSpeed score",
+    "workBreakdownStructure": [{"task": "Specific task name", "estimatedHours": 2, "priority": "QUICK_WIN" | "HIGH_IMPACT" | "ARCHITECTURAL"}],
     "totalEstimatedHours": 8,
-    "clientDeliverableSummary": "Deliverable summary",
-    "riskIfIgnored": "Competitive risk"
+    "clientDeliverableSummary": "Deliverable package summary",
+    "riskIfIgnored": "Competitive risk statement"
   },
   "saasTeam": {
     "persona": "SAAS_TEAM",
     "slaBreachRisk": "HIGH" | "MODERATE" | "LOW",
-    "performanceBudgetRule": {"metric": "LCP", "targetThreshold": "2000ms", "enforcementAction": "BLOCK_PR"},
-    "ciConfigSnippet": "lighthouserc.json snippet",
-    "sprintTicket": {"title": "Ticket title", "description": "Ticket desc", "acceptanceCriteria": ["Criteria 1"]},
-    "syntheticVsRumNote": "Synthetic vs RUM analysis"
+    "performanceBudgetRule": {"metric": "Metric name", "targetThreshold": "Threshold", "enforcementAction": "BLOCK_PR" | "WARN"},
+    "ciConfigSnippet": "Valid lighthouserc.json assertion block",
+    "sprintTicket": {"title": "Ticket title", "description": "Ticket description", "acceptanceCriteria": ["Criteria 1", "Criteria 2"]},
+    "syntheticVsRumNote": "Synthetic vs CrUX field data analysis"
   }
 }
-Pure JSON only.`;
+Pure JSON only, no markdown outside the JSON.`;
 
   const controller = new AbortController();
   const timeoutMs = provider === "OLLAMA" || provider === "CUSTOM" ? 60_000 : 25_000;

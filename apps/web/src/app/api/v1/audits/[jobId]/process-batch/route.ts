@@ -60,6 +60,11 @@ export async function POST(
           },
         });
 
+        await prisma.auditJob.update({
+          where: { id: job.id },
+          data: { failedUrls: 0, status: "PROCESSING" },
+        });
+
         // Now pick up the first batch from the newly re-queued executions
         queuedExecutions = await prisma.auditExecution.findMany({
           where: {

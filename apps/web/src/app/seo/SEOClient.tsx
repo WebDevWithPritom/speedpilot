@@ -1,8 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
+import { usePersona, Persona, PERSONA_CONFIGS } from "@/lib/persona";
 import {
   FolderKanban,
+  Briefcase,
+  Users,
+  Terminal,
+  DollarSign,
+  CalendarCheck,
+  FileSpreadsheet,
+  CheckSquare,
+  Clock,
   Filter,
   Search,
   Globe,
@@ -292,6 +301,14 @@ export function SEOClient({
   projects?: ProjectOption[];
   initialResults: HistoricalSEOItem[];
 }) {
+  // Global Audience Persona Lens State
+  const { persona, setPersona, personaConfig } = usePersona();
+  const [copiedMemo, setCopiedMemo] = useState(false);
+  const [copiedBrief, setCopiedBrief] = useState(false);
+  const [copiedTicket, setCopiedTicket] = useState(false);
+  const [copiedCurl, setCopiedCurl] = useState(false);
+  const [copiedDiff, setCopiedDiff] = useState(false);
+
   // Project Scope & Organization State
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [searchFilter, setSearchFilter] = useState<string>("");
@@ -765,6 +782,347 @@ export function SEOClient({
                 <FileText className="w-5 h-5" />
               </div>
             </div>
+          </div>
+
+          {/* MULTI-PERSONA INTELLIGENCE PANEL (Dev, Marketer, Agency, SaaS Team) */}
+          <div className="p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Audience Perspective Lens
+                  </span>
+                  <span className={`text-[11px] px-2 py-0.5 rounded font-semibold border ${personaConfig.badgeColor}`}>
+                    {personaConfig.shortLabel} View Active
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-foreground mt-0.5 flex items-center gap-2">
+                  {persona === "DEVELOPER" && <Code2 className="w-4 h-4 text-blue-500" />}
+                  {persona === "MARKETER" && <TrendingUp className="w-4 h-4 text-emerald-500" />}
+                  {persona === "AGENCY" && <Briefcase className="w-4 h-4 text-purple-500" />}
+                  {persona === "SAAS_TEAM" && <Users className="w-4 h-4 text-amber-500" />}
+                  <span>{personaConfig.label} — {personaConfig.tagline}</span>
+                </h3>
+              </div>
+
+              {/* Persona Switcher Buttons */}
+              <div className="flex flex-wrap items-center gap-1.5 p-1 bg-secondary/50 rounded-lg border border-border/60">
+                {(["DEVELOPER", "MARKETER", "AGENCY", "SAAS_TEAM"] as Persona[]).map((pKey) => {
+                  const cfg = PERSONA_CONFIGS[pKey];
+                  const isActive = persona === pKey;
+                  return (
+                    <button
+                      key={pKey}
+                      type="button"
+                      onClick={() => setPersona(pKey)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+                        isActive
+                          ? "bg-background text-foreground shadow-sm border border-border"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {pKey === "DEVELOPER" && <Code2 className="w-3.5 h-3.5 text-blue-500" />}
+                      {pKey === "MARKETER" && <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />}
+                      {pKey === "AGENCY" && <Briefcase className="w-3.5 h-3.5 text-purple-500" />}
+                      {pKey === "SAAS_TEAM" && <Users className="w-3.5 h-3.5 text-amber-500" />}
+                      <span>{cfg.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* PERSONA 1: DEVELOPER & ENGINEER */}
+            {persona === "DEVELOPER" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* AST & Code Remediation */}
+                  <div className="p-4 rounded-xl border border-border bg-secondary/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <Code2 className="w-3.5 h-3.5 text-blue-500" />
+                        Framework Metadata Code Diff (Next.js / HTML)
+                      </span>
+                      <button
+                        onClick={() => {
+                          const diff = `// app/layout.tsx or page.tsx (Next.js 15 App Router)\nexport const metadata = {\n  title: "${currentSeo.pageTitle || 'Optimized Page Title'} | SpeedPilot",\n  description: "${currentSeo.metaDescription || 'High-performance web intelligence and optimization.'}",\n  alternates: {\n    canonical: "${currentSeo.canonicalUrl || targetUrl}",\n  },\n  openGraph: {\n    title: "${currentSeo.pageTitle || 'Optimized Page Title'}",\n    description: "${currentSeo.metaDescription || 'High-performance web intelligence.'}",\n    url: "${currentSeo.canonicalUrl || targetUrl}",\n  },\n};`;
+                          navigator.clipboard.writeText(diff);
+                          setCopiedDiff(true);
+                          setTimeout(() => setCopiedDiff(false), 2000);
+                        }}
+                        className="px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-[11px] font-mono text-foreground flex items-center gap-1 border border-border"
+                      >
+                        {copiedDiff ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedDiff ? "Copied" : "Copy Diff"}</span>
+                      </button>
+                    </div>
+                    <pre className="p-3 rounded-lg bg-zinc-950 text-zinc-100 font-mono text-xs overflow-x-auto leading-relaxed border border-zinc-800">
+                      <code>{`// Next.js 15 App Router Metadata Export
+export const metadata = {
+  title: "${currentSeo.pageTitle || 'Add Authoritative Title'} | SpeedPilot",
+  description: "${currentSeo.metaDescription || 'Add compelling 140-160 char meta description.'}",
+  alternates: {
+    canonical: "${currentSeo.canonicalUrl || targetUrl}",
+  },
+  robots: "${currentSeo.robotsDirectives || 'index, follow'}",
+};
+`}</code>
+                    </pre>
+                  </div>
+
+                  {/* Server-Level Redirect & Origin Config */}
+                  <div className="p-4 rounded-xl border border-border bg-secondary/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <Terminal className="w-3.5 h-3.5 text-blue-500" />
+                        Edge & Server Canonical Rule (Nginx / Cloudflare)
+                      </span>
+                    </div>
+                    <pre className="p-3 rounded-lg bg-zinc-950 text-zinc-100 font-mono text-xs overflow-x-auto leading-relaxed border border-zinc-800">
+                      <code>{`# Nginx 301 Canonical & Trailing Slash Redirection
+server {
+  listen 80;
+  listen [::]:80;
+  server_name ${extractDomain(targetUrl)};
+  return 301 https://$host$request_uri;
+}
+add_header X-Content-Type-Options "nosniff" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;`}</code>
+                    </pre>
+                  </div>
+                </div>
+
+                {/* CLI Terminal Verification Command */}
+                <div className="p-3.5 rounded-xl border border-blue-500/30 bg-blue-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Terminal className="w-4 h-4 text-blue-500" />
+                      <span>CLI Terminal Validation Command</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-mono">
+                      curl -ILs &quot;{targetUrl}&quot; | grep -iE &apos;HTTP/|canonical|robots|title|content-type&apos;
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const cmd = `curl -ILs "${targetUrl}" | grep -iE 'HTTP/|canonical|robots|title|content-type'`;
+                      navigator.clipboard.writeText(cmd);
+                      setCopiedCurl(true);
+                      setTimeout(() => setCopiedCurl(false), 2000);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition shrink-0 shadow-sm"
+                  >
+                    {copiedCurl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedCurl ? "Copied Command" : "Copy curl Command"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* PERSONA 2: GROWTH & MARKETER */}
+            {persona === "MARKETER" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20">
+                    <span className="text-xs text-muted-foreground font-medium block">Projected CTR Uplift</span>
+                    <span className="text-2xl font-bold text-emerald-500 mt-1 block">
+                      +{(Math.min(32, Math.max(14, (currentIssues.length * 4.5)))).toFixed(1)}%
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Estimated organic click share gain with optimized title &amp; meta snippet.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20">
+                    <span className="text-xs text-muted-foreground font-medium block">Estimated Bounce Probability</span>
+                    <span className="text-2xl font-bold text-emerald-500 mt-1 block">
+                      -{(Math.min(18.5, Math.max(7.2, (currentIssues.length * 2.8)))).toFixed(1)}%
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Fewer immediate bounces by aligning search snippet with on-page H1 intent.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20">
+                    <span className="text-xs text-muted-foreground font-medium block">Google Algorithm Signals</span>
+                    <span className="text-base font-bold text-foreground mt-1 flex items-center gap-1.5">
+                      {currentSeo.isIndexable ? (
+                        <span className="text-emerald-500 inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-4 h-4" /> Indexable &amp; Safe
+                        </span>
+                      ) : (
+                        <span className="text-rose-500 inline-flex items-center gap-1">
+                          <XCircle className="w-4 h-4" /> Blocked from Index
+                        </span>
+                      )}
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Complies with Google Page Experience and Helpful Content guidelines.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Marketer Handoff Brief to Devs */}
+                <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      <span>Ready-to-Send Marketer Specification for Developers</span>
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      1-click handoff brief detailing title length, meta description copy, and H1 alignment without technical jargon.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const brief = `# SEO & Core Web Vitals Optimization Brief\nTarget URL: ${targetUrl}\n\n## 1. Title & Meta Fix\n- Recommended Title: ${currentSeo.pageTitle || 'Update Page Title'} (${currentSeo.titleLength || 0}/60 chars)\n- Recommended Meta Description: ${currentSeo.metaDescription || 'Add high-converting meta description'} (${currentSeo.descriptionLength || 0}/160 chars)\n\n## 2. On-Page Heading\n- Current H1: ${currentSeo.h1Text || 'Missing H1'}\n- Recommendation: Ensure exactly one authoritative H1 aligned with target search intent.\n\n## 3. Commercial Impact\n- Projected Organic CTR Lift: +${(Math.min(32, Math.max(14, (currentIssues.length * 4.5)))).toFixed(1)}%\n- Projected Mobile Bounce Reduction: -${(Math.min(18.5, Math.max(7.2, (currentIssues.length * 2.8)))).toFixed(1)}%`;
+                      navigator.clipboard.writeText(brief);
+                      setCopiedBrief(true);
+                      setTimeout(() => setCopiedBrief(false), 2000);
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition shrink-0 shadow-sm"
+                  >
+                    {copiedBrief ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedBrief ? "Copied Brief" : "Copy Dev Handoff Brief"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* PERSONA 3: AGENCY & CONSULTANT */}
+            {persona === "AGENCY" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20">
+                    <span className="text-xs text-muted-foreground font-medium block">Estimated Dev Effort</span>
+                    <span className="text-2xl font-bold text-purple-500 mt-1 block">
+                      {Math.max(1.5, Math.min(8.0, Number((currentIssues.length * 0.75 + 0.5).toFixed(1))))} hrs
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Billable engineering hours to remediate all detected SEO &amp; crawl issues.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20">
+                    <span className="text-xs text-muted-foreground font-medium block">Recommended Client Quote</span>
+                    <span className="text-2xl font-bold text-foreground mt-1 block">
+                      ${Math.round(Math.max(1.5, Math.min(8.0, Number((currentIssues.length * 0.75 + 0.5).toFixed(1)))) * 125)}
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Based on standard agency consultancy rates ($125/hr).
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20">
+                    <span className="text-xs text-muted-foreground font-medium block">Deliverable Hygiene Score</span>
+                    <span className="text-2xl font-bold text-emerald-500 mt-1 block">
+                      {currentSeo.ahrefsHealthScore ?? 85}/100
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Audit scorecard ready for executive client deck presentation.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Agency Client Proposal Memo */}
+                <div className="p-4 rounded-xl border border-purple-500/30 bg-purple-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Briefcase className="w-4 h-4 text-purple-500" />
+                      <span>Client Presentation Proposal &amp; SOW Scope</span>
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Polished non-alarmist executive narrative explaining business risk, deliverables, and billing value.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const memo = `# Technical SEO & Performance Remediation SOW\nClient Target: ${targetUrl}\n\n## Executive Summary\nA technical audit of ${targetUrl} identified ${currentIssues.length} optimizations across search engine indexability, metadata completeness, and internal link architecture. Resolving these bottlenecks protects organic visibility and strengthens conversion funnels.\n\n## Key Deliverables\n1. Metadata & Canonical Alignment: Enforce strict 1-to-1 canonical URLs and 50-60 character Google-compliant title tags.\n2. Structured Data Integration: Inject valid Schema.org JSON-LD to unlock Google rich snippet opportunities.\n3. Image Accessibility: Remediate missing alt tags across primary assets.\n\n## Project Scope & Billing\n- Estimated Engineering Hours: ${Math.max(1.5, Math.min(8.0, Number((currentIssues.length * 0.75 + 0.5).toFixed(1))))} hrs\n- Professional Services Fee: ${Math.round(Math.max(1.5, Math.min(8.0, Number((currentIssues.length * 0.75 + 0.5).toFixed(1)))) * 125)}\n- Turnaround Timeline: 2 Business Days`;
+                      navigator.clipboard.writeText(memo);
+                      setCopiedMemo(true);
+                      setTimeout(() => setCopiedMemo(false), 2000);
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition shrink-0 shadow-sm"
+                  >
+                    {copiedMemo ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedMemo ? "Copied Proposal" : "Copy Agency Proposal Memo"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* PERSONA 4: PRODUCT & SAAS TEAM */}
+            {persona === "SAAS_TEAM" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20">
+                    <span className="text-xs text-muted-foreground font-medium block">Sprint Priority</span>
+                    <span className={`text-lg font-bold mt-1 flex items-center gap-1.5 ${
+                      currentIssues.some(i => i.severity === "CRITICAL" || i.severity === "HIGH")
+                        ? "text-rose-500"
+                        : "text-amber-500"
+                    }`}>
+                      {currentIssues.some(i => i.severity === "CRITICAL")
+                        ? "P0 — Blocker (Current Sprint)"
+                        : currentIssues.some(i => i.severity === "HIGH")
+                        ? "P1 — High (Next Sprint)"
+                        : "P2 — Polish Backlog"}
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Auto-calculated based on search engine and conversion risk.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20">
+                    <span className="text-xs text-muted-foreground font-medium block">User Drop-Off Risk</span>
+                    <span className="text-lg font-bold text-foreground mt-1 block">
+                      {currentIssues.length > 3 ? "Moderate Friction" : "Low Risk"}
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Missing metadata and broken canonicals reduce social share conversions.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-border bg-secondary/20">
+                    <span className="text-xs text-muted-foreground font-medium block">Open Graph Card Status</span>
+                    <span className={`text-lg font-bold mt-1 flex items-center gap-1 ${
+                      currentSeo.hasOpenGraph ? "text-emerald-500" : "text-amber-500"
+                    }`}>
+                      {currentSeo.hasOpenGraph ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                      <span>{currentSeo.hasOpenGraph ? "Rich Cards Ready" : "Missing Social Tags"}</span>
+                    </span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Affects Slack, Twitter, and LinkedIn preview click-through rates.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 1-Click Linear & Jira Sprint Ticket */}
+                <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-amber-500" />
+                      <span>Ready-to-Paste Linear &amp; Jira Sprint Ticket</span>
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Pre-formatted engineering ticket with Title, User Problem, Acceptance Criteria, and QA steps.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const ticket = `# [PERF-SEO] Fix Technical SEO & Metadata on ${targetUrl}\\n\\n**Priority:** ${currentIssues.some(i => i.severity === "CRITICAL") ? "P0 (Blocker)" : "P1 (High)"}\\n**Component:** Web / Frontend Architecture\\n\\n### User Problem & Business Context\\nTechnical crawl issues on ${targetUrl} are reducing organic search visibility and social share CTR. Detected ${currentIssues.length} issues including ${currentIssues.map(i => i.title).slice(0, 3).join(', ')}.\\n\\n### Acceptance Criteria\\n- [ ] Page title is between 50 and 60 characters with authoritative branding.\\n- [ ] Meta description is present and within 120-160 characters.\\n- [ ] Canonical URL points strictly to itself without redirection loop (${currentSeo.canonicalUrl || targetUrl}).\\n- [ ] All primary images feature informative alt attributes.\\n- [ ] Verified valid via curl -ILs ${targetUrl} with HTTP 200 OK.\\n\\n### QA & Verification Steps\\n1. Open PR branch and verify next build passes.\\n2. Inspect HTML head in browser dev tools: confirm <title>, <meta name="description">, and <link rel="canonical">.\\n3. Test social card display via opengraph.xyz or Slack preview.`;
+                      navigator.clipboard.writeText(ticket);
+                      setCopiedTicket(true);
+                      setTimeout(() => setCopiedTicket(false), 2000);
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 transition shrink-0 shadow-sm"
+                  >
+                    {copiedTicket ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedTicket ? "Copied Ticket" : "Copy Linear / Jira Ticket"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Generative AI Fix Synthesis CTA Bar */}

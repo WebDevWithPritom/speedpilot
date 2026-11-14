@@ -95,6 +95,7 @@ export default function BulkAuditJobResultsPage() {
     try {
       let isDone = false;
       let consecutiveZeroBatches = 0;
+      let batchCount = 0;
 
       while (!isDone && !isCancelledRef.current) {
         const res = await fetch(`/api/v1/audits/${jobId}/process-batch`, {
@@ -111,8 +112,6 @@ export default function BulkAuditJobResultsPage() {
         const resJson = await res.json();
         const batchData = resJson.data;
 
-        await fetchJobStatus();
-
         if (!batchData) {
           isDone = true;
           break;
@@ -124,6 +123,25 @@ export default function BulkAuditJobResultsPage() {
         setResumeProgressMsg(
           `⚡ Auto-processing: ${completed} of ${total} completed (${remaining} remaining in background)...`
         );
+
+        setJobData((prev: any) => {
+          if (!prev) return prev;
+          const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+          return {
+            ...prev,
+            progress: {
+              ...prev.progress,
+              completed,
+              percentage: pct,
+            },
+          };
+        });
+
+        batchCount++;
+        // Refresh full table telemetry every 3 batches or when completed
+        if (batchCount % 3 === 0 || batchData.isAllFinished || remaining === 0) {
+          await fetchJobStatus();
+        }
 
         if (batchData.isAllFinished || remaining === 0) {
           isDone = true;
@@ -149,7 +167,12 @@ export default function BulkAuditJobResultsPage() {
       }
     } catch (err: unknown) {
       console.error("Auto-resume error:", err);
-      showToast((err as Error).message || "Batch runner encountered an error.");
+      showToast("Auto-processing will retry momentarily...");
+      if (!isCancelledRef.current) {
+        setTimeout(() => {
+          handleResumeAudit(true);
+        }, 2500);
+      }
     } finally {
       setResuming(false);
       setResumeProgressMsg(null);
@@ -552,15 +575,20 @@ Exported from SpeedPilot SaaS Team Console`;
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">
-              Progress: {jobData.progress.completed} of {jobData.progress.total} executions completed
-              {jobData.progress.failed > 0 && ` (${jobData.progress.failed} failed)`}
+              Progress: <span className="font-semibold text-foreground">{jobData.progress.completed}</span> of{" "}
+              <span className="font-semibold text-foreground">{jobData.progress.total}</span> executions completed
+              {jobData.progress.completed < jobData.progress.total && (
+                <span className="ml-1 text-amber-500 font-medium">
+                  ({jobData.progress.total - jobData.progress.completed} remaining)
+                </span>
+              )}
             </span>
             <span className="font-mono font-semibold">{jobData.progress.percentage}%</span>
           </div>
           <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
-                jobData.progress.failed > 0 ? "bg-amber-500" : "bg-primary"
+                jobData.progress.percentage === 100 ? "bg-emerald-500" : "bg-primary"
               }`}
               style={{ width: `${jobData.progress.percentage}%` }}
             />
@@ -600,12 +628,12 @@ Exported from SpeedPilot SaaS Team Console`;
               <div className="flex items-center gap-1.5">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>
-                  {hasTimedOutExecutions
+                  {canResume
                     ? "Audit Batch Paused by Serverless Host (60s Execution Limit)"
                     : "Audit Execution Encountered an External API Constraint"}
                 </span>
               </div>
-              {hasTimedOutExecutions && (
+              {canResume && (
                 <button
                   type="button"
                   onClick={() => handleResumeAudit(true)}

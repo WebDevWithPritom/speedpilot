@@ -19,7 +19,7 @@ export class PageSpeedClient {
     this.apiKey = config.apiKey || process.env.GOOGLE_PAGESPEED_API_KEY;
     this.timeoutMs =
       config.timeoutMs ??
-      (process.env.PAGESPEED_TIMEOUT_MS ? parseInt(process.env.PAGESPEED_TIMEOUT_MS, 10) : 60_000);
+      (process.env.PAGESPEED_TIMEOUT_MS ? parseInt(process.env.PAGESPEED_TIMEOUT_MS, 10) : 12_000);
   }
 
   /**

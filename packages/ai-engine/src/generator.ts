@@ -6,6 +6,7 @@ import {
 import { getDeterministicRecommendation } from "./templates.js";
 import { computeIssueSignature } from "./signature.js";
 import { AIProvider, PROVIDER_DEFAULTS, buildProviderCandidates } from "./providers.js";
+import { detectVendorSignatures } from "./vendor-intelligence.js";
 
 export type { AIProvider };
 
@@ -68,7 +69,7 @@ function mapParsedRecommendation(
   // Prevent small local models from confusing cache issues with <link rel="preload">
   if (
     (issueCode === "cache-insight" || issueCode === "uses-long-cache-ttl") &&
-    !/cache-control|expires|max-age|cdn|cloudflare/i.test(snippet)
+    !/cache-control|expires|max-age|cdn|cloudflare|htaccess|nginx/i.test(snippet)
   ) {
     snippet = baseline.remediationCodeSnippet ?? "";
     devExplanation = baseline.explanationDeveloper ?? "";
@@ -135,6 +136,9 @@ export async function generateAIFixRecommendation(
     targetOrigin = "";
   }
   const evidenceSlice = req.issue.evidenceItems.slice(0, 8);
+  const evidenceUrls = evidenceSlice.map((e) => e.url).filter((u): u is string => Boolean(u));
+  const detectedVendors = detectVendorSignatures(evidenceUrls);
+
   const firstPartyUrls = evidenceSlice
     .map((e) => e.url)
     .filter((u): u is string => Boolean(u && (!targetOrigin || u.startsWith("/") || u.startsWith(targetOrigin))));
@@ -149,6 +153,12 @@ export async function generateAIFixRecommendation(
     detectedPluginsAndCDN: req.subStacks || [],
     existingHeadHints: req.existingHints || [],
     responseHeaders: req.responseHeaders || {},
+    detectedVendors: detectedVendors.map((v) => ({
+      vendorName: v.vendorName,
+      category: v.category,
+      flaggedUrl: v.flaggedUrl,
+      impact: v.impactDescription,
+    })),
     firstPartyUrls,
     thirdPartyUrls,
     recommendedFixBaseline: {
@@ -166,27 +176,42 @@ export async function generateAIFixRecommendation(
     },
   };
 
-  const systemPrompt = `You are SpeedPilot's Senior Web Performance & Coding Standards AI Architect.
-Given real diagnostic audit evidence from Google PageSpeed Insights (Lighthouse 13), provide audience-tailored recommendations and exact copy-pasteable fixes.
-You must return a valid JSON object matching this exact schema:
+  const systemPrompt = `You are SpeedPilot's Principal Web Performance & Systems Architect.
+Your task is to transform Google PageSpeed Insights (Lighthouse 13) diagnostic evidence into ACTUAL, PRODUCTION-READY SOLUTIONS.
+
+CRITICAL INSTRUCTION - NO GENERIC OR TEXTBOOK ADVICE:
+1. NEVER output vague generic advice like "Optimize your images", "Minimize CSS", "Use a CDN", "Defer unneeded scripts", or "Consider code splitting".
+2. Every fix MUST contain the EXACT filenames, URLs, CSS selectors, or component names found in the audit evidence.
+3. Every code snippet MUST be valid, copy-pasteable code matching the detected tech stack (${req.techStack}):
+   - If NEXTJS: Use Next.js idioms: 'next/image' (<Image src="..." fill/width/height priority/sizes="..."/>), 'next/font' (subsets, display:'swap'), '@next/third-parties' (<GoogleTagManager/>, <GoogleAnalytics/>), 'next/dynamic' ({ ssr: false }), or 'next/script' (strategy="lazyOnload" or "worker").
+   - If WORDPRESS / WOOCOMMERCE: Provide exact PHP filters ('add_filter("style_loader_tag", ...)', 'add_filter("script_loader_tag", ...)') or exact LiteSpeed Cache / WP Rocket setting paths.
+   - If SHOPIFY: Provide exact Liquid theme code for 'layout/theme.liquid' using 'asset_url | preload_tag', async attributes, or section rendering.
+   - If REACT / VITE: Provide exact 'vite.config.ts' (manualChunks / rollupOptions) or React.lazy / Suspense / web worker patterns.
+   - If HTML / PHP / LARAVEL: Provide exact <head> tags, Apache '.htaccess' rules, or Nginx server blocks.
+4. If third-party tracking scripts are detected (GTM, Meta Pixel, Hotjar, Intercom, Clarity, TikTok, YouTube embeds): Provide the exact Facade Pattern (load on interaction or idle) rather than executing upfront on page load.
+5. If userSourceCode is provided, patch those exact lines and show the modified code block.
+6. Only suggest <link rel="preconnect"> for thirdPartyUrls (NEVER for targetUrl's own domain).
+
+OUTPUT SCHEMA (Strict JSON only, no markdown outside JSON):
 {
   "detectedStack": "${req.techStack}",
-  "explanationMarketer": "Simple plain-English explanation of how this hurts visitors, Google rankings, and conversions",
-  "explanationDeveloper": "Simple, beginner-friendly English explaining what is broken, which exact flagged file, URL, or CSS selector causes it, and the modern coding standard rule to fix it",
-  "explanationAgency": "Client-facing summary emphasizing ROI and score gains",
-  "explanationSaaSTeam": "Product & release guidance on preventing speed and accessibility regressions",
-  "remediationCodeSnippet": "Clean, copy-pasteable code snippet ONLY for ${req.techStack} preserving the mechanism in recommendedFixBaseline using EXACT URLs/selectors from evidenceItems (and patching userSourceCode directly if provided!)",
-  "implementationSteps": ["Step 1 naming exact flagged asset/plugin/file", "Step 2", "Step 3"],
-  "verificationSteps": ["Verification step 1", "Verification step 2"],
+  "explanationMarketer": "Plain-English business impact: how this specific bottleneck increases bounce rates, hurts Google organic ranking, and lowers conversions.",
+  "explanationDeveloper": "Exact technical root cause naming the specific flagged file, asset URL, or CSS selector, why the browser pipeline stalled, and the exact modern standard rule to fix it.",
+  "explanationAgency": "Client-facing pitch emphasizing measurable PageSpeed score gains, billable ROI, and risk if ignored.",
+  "explanationSaaSTeam": "Engineering guidance: Lighthouse CI budget assertions, PR gating threshold, and synthetic vs RUM monitoring.",
+  "remediationCodeSnippet": "Working, copy-pasteable production code for ${req.techStack} using the actual URLs/selectors from evidence.",
+  "implementationSteps": [
+    "Step 1: Specific action with exact file name or setting",
+    "Step 2: Specific code modification",
+    "Step 3: Asset rebuild or cache purge"
+  ],
+  "verificationSteps": [
+    "Step 1: Exact DevTools Network or Performance tab check",
+    "Step 2: CLI verification command or SpeedPilot re-audit threshold"
+  ],
   "estimatedDifficulty": "EASY" | "MEDIUM" | "HARD",
   "estimatedImpact": "LOW" | "MEDIUM" | "HIGH"
-}
-Rules:
-1. Preserve the exact technical fix pattern shown in recommendedFixBaseline (do NOT change cache-insight to <link rel="preload">, never truncate URLs).
-2. If userSourceCode is provided, patch those exact lines for ${req.techStack}.
-3. Only suggest <link rel="preconnect"> for thirdPartyUrls (NEVER for targetUrl's own origin).
-4. Respect detectedPluginsAndCDN and existingHeadHints. Output pure JSON without markdown fences.
-5. No AI slop: Avoid throat-clearing ("Here is why", "In today's world"), binary contrasts ("It is not X, it is Y"), colon reveals, rhetorical setups, and vague puffery ("pivotal", "vital role", "testament"). State the specific bottleneck, exact metrics, and direct remediation.`;
+}`;
 
   // Try candidates sequentially so rate limits or blocked keys auto-failover
   for (const candidate of candidates) {
@@ -270,4 +295,3 @@ Rules:
     completionTokens: 0,
   };
 }
-

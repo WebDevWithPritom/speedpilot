@@ -136,18 +136,35 @@ export default function ExecutionDeepDivePage() {
   const buildIssuePrompt = (issue: any, shortForUrl = false) => {
     const stack = issue.recommendations?.[0]?.detectedStack || "UNKNOWN";
     const evList = (issue.evidenceDetails || [])
-      .slice(0, shortForUrl ? 5 : 10)
+      .slice(0, shortForUrl ? 4 : 10)
       .map((e: any) => `- ${e.url || e.selector || e.description || "flagged item"}${e.wastedMs ? ` (${e.wastedMs}ms)` : ""}`)
       .join("\n");
     const codeSuffix =
       !shortForUrl && pastedCode.trim()
-        ? `\n\nMy source code (${sourceFilename.trim() || "snippet"}):\n\`\`\`\n${pastedCode.trim().slice(0, 3500)}\n\`\`\``
+        ? `\n\nExisting Source Code (${sourceFilename.trim() || "snippet"}):\n\`\`\`\n${pastedCode.trim().slice(0, 3500)}\n\`\`\``
         : "";
+
+    if (shortForUrl) {
+      return [
+        `You are a Principal Web Performance Architect. Fix Google PageSpeed issue [${issue.code}] "${issue.title}" on ${execution?.url} (${execution?.device}, Stack: ${stack}).`,
+        evList ? `Evidence:\n${evList}` : "",
+        `Give an exact, copy-pasteable production code solution for ${stack} using these real files. No generic advice.`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+    }
+
     return [
-      `Fix this Google PageSpeed / Lighthouse issue on ${execution?.url} (${execution?.device}, Stack: ${stack}).`,
-      `Issue: [${issue.code}] ${issue.title}${issue.displayValue ? ` — ${issue.displayValue}` : ""}`,
-      evList ? `Flagged evidence:\n${evList}` : "",
-      `Give exact copy-paste code using modern coding standards (tell me exact preload/preconnect/prefetch/defer/Cache-Control/WCAG tags only for these real files).${codeSuffix}`,
+      `You are a Principal Web Performance Engineer and Full-Stack Systems Architect.`,
+      `Provide an ACTUAL, PRODUCTION-READY SOLUTION for this Google PageSpeed / Lighthouse 13 diagnostic bottleneck on ${execution?.url} (Device: ${execution?.device}, Tech Stack: ${stack}).`,
+      `Diagnostic: [${issue.code}] ${issue.title}${issue.displayValue ? ` — ${issue.displayValue}` : ""}`,
+      evList ? `Flagged Diagnostic Evidence from Audit:\n${evList}` : "",
+      `CRITICAL RULES:
+1. NO GENERIC OR TEXTBOOK ADVICE: Do NOT tell me to "optimize images", "use a CDN", or "defer unneeded scripts" in abstract terms.
+2. Provide working, copy-pasteable code matching ${stack} with exact file paths (e.g. app/layout.tsx, next.config.mjs, functions.php, theme.liquid, .htaccess, or nginx.conf).
+3. Use the EXACT URLs, selectors, and asset filenames from the flagged evidence above.
+4. If third-party tracking/media scripts are flagged (GTM, Meta Pixel, Hotjar, Intercom, YouTube, etc.), provide the exact Facade Pattern or delayed execution on user interaction.
+5. Provide step-by-step implementation and verification steps using Chrome DevTools or terminal commands.${codeSuffix}`,
     ]
       .filter(Boolean)
       .join("\n\n");

@@ -54,34 +54,33 @@ export async function GET(
         await prisma.auditExecution.updateMany({
           where: { id: { in: pending.map((e) => e.id) } },
           data: {
-            status: "FAILED",
+            status: "PAUSED",
             errorMessage: "Paused by serverless host (60s limit). Click 'Resume Audit' to process remaining URLs.",
           },
         });
 
-        const newFailed = job.failedUrls + pending.length;
         const newStatus = job.completedUrls > 0 ? "PARTIAL_FAILURE" : "FAILED";
 
         await prisma.auditJob.update({
           where: { id: job.id },
           data: {
-            failedUrls: newFailed,
             status: newStatus,
             completedAt: new Date(),
           },
         });
 
         job.status = newStatus;
-        job.failedUrls = newFailed;
         pending.forEach((p) => {
-          p.status = "FAILED";
+          p.status = "PAUSED";
           p.errorMessage = "Paused by serverless host (60s limit). Click 'Resume Audit' to process remaining URLs.";
         });
       }
     }
 
+    const completedCount = job.executions.filter((e) => e.status === "COMPLETED").length;
+    const failedCount = job.executions.filter((e) => e.status === "FAILED").length;
     const progressPercentage =
-      job.totalUrls > 0 ? Math.round(((job.completedUrls + job.failedUrls) / job.totalUrls) * 100) : 0;
+      job.totalUrls > 0 ? Math.round((completedCount / job.totalUrls) * 100) : 0;
 
     return NextResponse.json({
       data: {
@@ -91,8 +90,8 @@ export async function GET(
         deviceMode: job.deviceMode,
         progress: {
           total: job.totalUrls,
-          completed: job.completedUrls,
-          failed: job.failedUrls,
+          completed: completedCount,
+          failed: failedCount,
           percentage: progressPercentage,
         },
         startedAt: job.startedAt,
