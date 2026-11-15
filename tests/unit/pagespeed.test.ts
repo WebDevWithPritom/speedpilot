@@ -5,7 +5,7 @@ import {
   classifyCLS,
   classifyOverallScore,
 } from "@speedpilot/shared";
-import { parseGooglePSIResponse, generateDryRunSimulation } from "@speedpilot/pagespeed";
+import { parseGooglePSIResponse, PageSpeedAPIError } from "@speedpilot/pagespeed";
 
 describe("PageSpeed Suite — Core Web Vitals & Metric Parsing", () => {
   it("accurately classifies LCP thresholds according to Google Web Vitals", () => {
@@ -76,16 +76,10 @@ describe("PageSpeed Suite — Core Web Vitals & Metric Parsing", () => {
     expect(parsed.labMetrics.cls).toBe(0.04);
   });
 
-  it("generates deterministic dry-run simulation when live PSI is unavailable", () => {
-    const mobileSim = generateDryRunSimulation("https://example.com/pricing", "MOBILE");
-    const desktopSim = generateDryRunSimulation("https://example.com/pricing", "DESKTOP");
-
-    expect(mobileSim.scores.performance).toBeGreaterThanOrEqual(10);
-    expect(mobileSim.scores.performance).toBeLessThanOrEqual(100);
-    expect(mobileSim.labMetrics.lcpMs).toBeGreaterThan(0);
-    expect(mobileSim.issues.length).toBeGreaterThan(0);
-
-    // Desktop scores should generally outperform or equal mobile scores in synthetic modeling
-    expect(desktopSim.scores.performance).toBeGreaterThanOrEqual(mobileSim.scores.performance);
+  it("PageSpeedAPIError properly encapsulates status codes and error details", () => {
+    const err = new PageSpeedAPIError("Google PSI rate limit", 429);
+    expect(err.name).toBe("PageSpeedAPIError");
+    expect(err.message).toBe("Google PSI rate limit");
+    expect(err.status).toBe(429);
   });
 });

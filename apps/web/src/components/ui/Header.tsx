@@ -127,7 +127,7 @@ export function Header({ initialUser }: { initialUser?: any }) {
                       {currentUser.name || currentUser.email}
                     </span>
                     <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-primary/15 text-primary shrink-0">
-                      {currentUser.tier}
+                      {currentUser.tier === "FREE" ? "PREVIEW" : currentUser.tier}
                     </span>
                   </div>
 

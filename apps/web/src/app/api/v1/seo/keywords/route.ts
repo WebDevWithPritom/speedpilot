@@ -108,6 +108,21 @@ export async function POST(req: NextRequest) {
       checkedAt: new Date().toISOString(),
     };
 
+    const existingKeyword = await prisma.keywordRanking.findUnique({
+      where: {
+        projectId_keyword: {
+          projectId: targetProject.id,
+          keyword: cleanKeyword,
+        },
+      },
+    });
+
+    const previousRank = existingKeyword ? existingKeyword.currentRank : null;
+    const existingHistory = Array.isArray(existingKeyword?.history)
+      ? (existingKeyword.history as any[])
+      : [];
+    const updatedHistory = [...existingHistory, historyEntry].slice(-20);
+
     const savedKeyword = await prisma.keywordRanking.upsert({
       where: {
         projectId_keyword: {
@@ -131,14 +146,14 @@ export async function POST(req: NextRequest) {
       },
       update: {
         targetDomain,
-        previousRank: currentRank,
+        previousRank,
         currentRank,
         intent: serpResult?.intent || null,
         country: serpResult?.country || "GLOBAL",
         targetUrl,
         topCompetitor,
         topCompetitorUrl,
-        history: [historyEntry],
+        history: updatedHistory,
         lastCheckedAt: new Date(),
       },
       include: {

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     const keywords = await prisma.keywordRanking.findMany({
       where,
-      take: 25, // Safely within serverless limit
+      take: 12, // Safely within serverless 60s limit for live network SERP queries
       orderBy: { lastCheckedAt: "asc" },
     });
 

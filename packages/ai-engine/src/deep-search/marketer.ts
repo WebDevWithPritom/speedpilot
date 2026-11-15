@@ -23,25 +23,6 @@ export function extractSearchKeyword(targetUrl: string): string {
   }
 }
 
-export function computeEstimatedRank(targetUrl: string, isHighSeverity: boolean): { rank: number; status: string } {
-  let hash = 0;
-  for (let i = 0; i < targetUrl.length; i++) {
-    hash = (hash << 5) - hash + targetUrl.charCodeAt(i);
-    hash |= 0;
-  }
-  let rank = (Math.abs(hash) % 6) + 2; // Rank between 2 and 7
-  if (isHighSeverity && rank < 4) {
-    rank = 4;
-  }
-  const status = rank <= 3
-    ? `Top 3 on Google • High Organic CTR`
-    : rank <= 10
-    ? `Rank #${rank} • Page 1 on Google`
-    : `Rank #${rank} • Page 2 on Google`;
-
-  return { rank, status };
-}
-
 export function getDeterministicMarketerDeepSearch(
   issue: NormalizedAuditIssue,
   techStack: TechStack,
@@ -50,15 +31,14 @@ export function getDeterministicMarketerDeepSearch(
   const wastedMs = issue.evidenceItems[0]?.wastedMs || 500;
   const isHighSeverity = issue.severity === "HIGH" || issue.severity === "CRITICAL";
   const keyword = extractSearchKeyword(targetUrl);
-  const { rank, status } = computeEstimatedRank(targetUrl, isHighSeverity);
 
   switch (issue.code) {
     case "render-blocking-resources":
       return {
         persona: "MARKETER",
-        currentSearchRank: rank,
+        currentSearchRank: null,
         currentSearchKeyword: keyword,
-        serpPositionStatus: status,
+        serpPositionStatus: undefined,
         serpRankRisk: isHighSeverity ? "HIGH" : "MEDIUM",
         projectedBounceRateDelta: "-12.8% mobile bounce probability reduction",
         estimatedConversionUplift: "+3.8% projected mobile conversion increase",
@@ -76,9 +56,9 @@ export function getDeterministicMarketerDeepSearch(
     case "prioritize-lcp-image":
       return {
         persona: "MARKETER",
-        currentSearchRank: rank,
+        currentSearchRank: null,
         currentSearchKeyword: keyword,
-        serpPositionStatus: status,
+        serpPositionStatus: undefined,
         serpRankRisk: "HIGH",
         projectedBounceRateDelta: "-15.2% bounce rate reduction on entry pages",
         estimatedConversionUplift: "+5.1% lift in above-the-fold call-to-action clicks",
@@ -94,9 +74,9 @@ export function getDeterministicMarketerDeepSearch(
     default:
       return {
         persona: "MARKETER",
-        currentSearchRank: rank,
+        currentSearchRank: null,
         currentSearchKeyword: keyword,
-        serpPositionStatus: status,
+        serpPositionStatus: undefined,
         serpRankRisk: isHighSeverity ? "HIGH" : "MEDIUM",
         projectedBounceRateDelta: "-6.4% estimated bounce rate decrease",
         estimatedConversionUplift: "+2.0% general user engagement lift",

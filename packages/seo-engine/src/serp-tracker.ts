@@ -134,7 +134,7 @@ export async function trackSerpRank(params: SerpTrackerParams): Promise<SerpTrac
     }
   }
 
-  // Tier 2: Zero-Key Web HTML Parser (DuckDuckGo HTML search)
+  // Tier 2: Zero-Key Web HTML Parser (DuckDuckGo Lite search via POST)
   if (competitors.length === 0) {
     providerUsed = "DUCKDUCKGO_HTML";
     try {
@@ -146,61 +146,63 @@ export async function trackSerpRank(params: SerpTrackerParams): Promise<SerpTrac
         AU: "au-en",
         DE: "de-de",
       };
-      const klParam = klMap[selectedCountry] ? `&kl=${klMap[selectedCountry]}` : "";
-      const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(keyword)}${klParam}`;
-      const res = await safeFetch(searchUrl, {
+      const postParams: Record<string, string> = { q: keyword };
+      if (klMap[selectedCountry]) {
+        postParams.kl = klMap[selectedCountry];
+      }
+      const postBody = new URLSearchParams(postParams).toString();
+
+      const res = await safeFetch("https://lite.duckduckgo.com/lite/", {
+        method: "POST",
         timeoutMs: 10_000,
         headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.9",
         },
+        body: postBody,
       });
 
-      if (res.status < 200 || res.status >= 300) {
-        throw new Error(`SERP search returned HTTP ${res.status}`);
-      }
+      if (res.status >= 200 && res.status < 300) {
+        const html = await res.text();
 
-      const html = await res.text();
-
-      // Extract results from DDG HTML: class="result__body"
-      const resultBlockRegex = /<div class="result__body">([\s\S]*?)<\/div>\s*<\/div>/g;
-      let match: RegExpExecArray | null;
-      let rankCounter = 1;
-
-      while ((match = resultBlockRegex.exec(html)) !== null && rankCounter <= 10) {
-        const block = match[1] || "";
-
-        // Extract Title and URL
-        const titleMatch = /<a[^>]*class="result__url"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i.exec(block) ||
-                           /<a[^>]*class="result__snippet"[^>]*href="([^"]*)"/i.exec(block);
-
-        const headingMatch = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i.exec(block);
-
-        const snippetMatch = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/i.exec(block);
-
-        let url = headingMatch?.[1] || titleMatch?.[1] || "";
-        // Decode DDG redirect url: /l/?kh=-1&uddg=https%3A%2F%2Fexample.com...
-        if (url && url.includes("uddg=")) {
-          const uddgParam = url.split("uddg=")[1]?.split("&")[0];
-          if (uddgParam) {
-            url = decodeURIComponent(uddgParam);
-          }
+        // Extract snippets
+        const snippetRegex = /<td[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/gi;
+        const snippets: string[] = [];
+        let snipMatch: RegExpExecArray | null;
+        while ((snipMatch = snippetRegex.exec(html)) !== null) {
+          snippets.push(decodeHtmlEntities(snipMatch[1]));
         }
 
-        const title = headingMatch?.[2] ? decodeHtmlEntities(headingMatch[2]) : "Untitled Search Result";
-        const snippet = snippetMatch?.[1] ? decodeHtmlEntities(snippetMatch[1]) : "";
-        const domain = extractHostname(url);
+        // Extract result links and titles
+        const linkRegex = /<a[^>]*href=['"]([^'"]*)['"][^>]*class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/gi;
+        let linkMatch: RegExpExecArray | null;
+        let rankCounter = 1;
 
-        if (url && domain && !url.includes("duckduckgo.com")) {
-          competitors.push({
-            rank: rankCounter++,
-            title,
-            url,
-            domain,
-            snippet,
-          });
+        while ((linkMatch = linkRegex.exec(html)) !== null && rankCounter <= 10) {
+          let url = linkMatch[1] || "";
+          if (url.includes("uddg=")) {
+            const uddgParam = url.split("uddg=")[1]?.split("&")[0];
+            if (uddgParam) {
+              url = decodeURIComponent(uddgParam);
+            }
+          }
+
+          const title = decodeHtmlEntities(linkMatch[2]);
+          const snippet = snippets[rankCounter - 1] || "";
+          const domain = extractHostname(url);
+
+          if (url && domain && !url.includes("duckduckgo.com")) {
+            competitors.push({
+              rank: rankCounter++,
+              title,
+              url,
+              domain,
+              snippet,
+            });
+          }
         }
       }
 

@@ -28,8 +28,8 @@ if (detected.length < 8) {
 // 2. Training Corpus & Few-Shot Retriever
 console.log("\n[Training Corpus Validation]");
 console.log(`-> Total Gold-Standard Training Exemplars: ${TRAINING_CORPUS.length}`);
-if (TRAINING_CORPUS.length < 56) {
-  throw new Error(`Expected at least 56 training exemplars, found ${TRAINING_CORPUS.length}`);
+if (TRAINING_CORPUS.length < 68) {
+  throw new Error(`Expected at least 68 training exemplars, found ${TRAINING_CORPUS.length}`);
 }
 
 const clsExemplar = findBestTrainingExemplar("cumulative-layout-shift", "NEXTJS");
@@ -44,7 +44,13 @@ console.log(`-> Retrieved Shopify Variant exemplar: ${variantExemplar?.title}`);
 const livewireExemplar = findBestTrainingExemplar("interaction-to-next-paint", "LARAVEL");
 console.log(`-> Retrieved Laravel Livewire exemplar: ${livewireExemplar?.title}`);
 
-const domSizeExemplar = findBestTrainingExemplar("dom-size", "CUSTOM");
-console.log(`-> Retrieved DOM Size content-visibility exemplar: ${domSizeExemplar?.title}`);
+const loafExemplar = findBestTrainingExemplar("interaction-to-next-paint", "CUSTOM");
+console.log(`-> Retrieved LoAF Attribution exemplar: ${loafExemplar?.title}`);
 
-console.log("\n[SUCCESS] All validation suites passed cleanly with 56/56 exemplars and 8/8 vendors!");
+const prerenderExemplar = findBestTrainingExemplar("largest-contentful-paint", "CUSTOM");
+console.log(`-> Retrieved Speculation Rules Prerender exemplar: ${prerenderExemplar?.title}`);
+
+const hposExemplar = findBestTrainingExemplar("server-response-time", "WOOCOMMERCE");
+console.log(`-> Retrieved WooCommerce HPOS exemplar: ${hposExemplar?.title}`);
+
+console.log("\n[SUCCESS] All validation suites passed cleanly with 68/68 exemplars and 8/8 vendors!");

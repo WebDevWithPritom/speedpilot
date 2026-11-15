@@ -122,7 +122,7 @@ export function DeepSearchExplorer() {
               Deep Search Diagnostic Engine
             </h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Simulate specialized root-cause and impact analysis for Developers, Marketers, Agencies, and SaaS Teams.
+              Synthesize specialized root-cause and live impact intelligence for Developers, Marketers, Agencies, and SaaS Teams.
             </p>
           </div>
 

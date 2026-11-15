@@ -2971,6 +2971,702 @@ add_action('wp_enqueue_scripts', function() {
       estimatedImpact: "HIGH",
     },
   },
+
+  // 57. GoogleChrome/web-vitals LoAF Attribution Hook
+  {
+    id: "custom-web-vitals-loaf-attribution-inp",
+    issueCode: "interaction-to-next-paint",
+    techStack: "CUSTOM",
+    title: "Capture Production INP Long Animation Frames (LoAF) with web-vitals/attribution",
+    inputDescription: "Target: https://modern-saas.com - Flagged: Real users reporting 480ms INP delays in Chrome User Experience Report (CrUX) that do not appear in synthetic lab audits",
+    flaggedAssets: ["https://modern-saas.com/assets/app.js"],
+    goldStandardOutput: {
+      detectedStack: "CUSTOM",
+      explanationMarketer: "Your laboratory speed tests look green, but actual paying visitors on older phones or busy laptops are experiencing laggy clicks. Setting up real-user telemetry identifies exactly which script froze the customer's click in the wild.",
+      explanationDeveloper: "Field INP issues often elude synthetic testing because lab runs lack real input events. Deploy the official Google 'web-vitals/attribution' library to capture Long Animation Frame (LoAF) metadata—including the exact offending script URL, character offset, invoker element, and duration—and beacon it via navigator.sendBeacon.",
+      explanationAgency: "Provides definitive, pinpoint telemetry on real-world INP bottlenecks directly from user sessions, eliminating guesswork.",
+      explanationSaaSTeam: "Integrate Google Chrome web-vitals attribution telemetry into production APM dashboards.",
+      remediationCodeSnippet: `// In src/vitals.ts (using official GoogleChrome/web-vitals):
+import { onINP } from 'web-vitals/attribution';
+
+onINP((metric) => {
+  // Extract Long Animation Frame (LoAF) diagnostic details:
+  const attribution = metric.attribution;
+  const longestScript = attribution.longAnimationFrameEntries?.[0]?.scripts?.[0];
+
+  const payload = {
+    metric: 'INP',
+    value: metric.value, // e.g., 420ms
+    rating: metric.rating, // 'good' | 'needs-improvement' | 'poor'
+    interactionTarget: attribution.interactionTarget, // CSS selector
+    interactionType: attribution.interactionType, // 'pointer' | 'keyboard'
+    offendingScript: longestScript?.sourceURL || 'unknown',
+    offendingFunction: longestScript?.sourceFunctionName || 'unknown',
+    scriptDuration: longestScript?.duration || 0,
+  };
+
+  // Deliver non-blocking telemetry via sendBeacon:
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon('/api/v1/telemetry/vitals', JSON.stringify(payload));
+  }
+}, { reportAllChanges: true });`,
+      implementationSteps: [
+        "Install official Google Chrome library: npm install web-vitals",
+        "Import onINP from 'web-vitals/attribution' and register the beacon listener",
+        "Inspect telemetry backend to map real user clicks to specific JavaScript source files and line numbers",
+      ],
+      verificationSteps: [
+        "In Chrome DevTools Console, trigger interaction and verify payload contains interactionTarget and offendingScript",
+        "Re-run SpeedPilot audit to verify telemetry overhead is zero (< 1KB gzipped)",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 58. Speculation Rules API for Instant Prerendering
+  {
+    id: "custom-speculation-rules-prerender-lcp",
+    issueCode: "largest-contentful-paint",
+    techStack: "CUSTOM",
+    title: "Achieve Instant 0ms LCP Page Transitions using Speculation Rules API",
+    inputDescription: "Target: https://high-traffic-portal.com - Flagged: 2.1s LCP delay on internal catalog navigation despite fast server response",
+    flaggedAssets: ["https://high-traffic-portal.com/catalog/top-products"],
+    goldStandardOutput: {
+      detectedStack: "CUSTOM",
+      explanationMarketer: "When shoppers hover over a product link, the browser can secretly pre-render the next page in the background in less than a quarter second. When they actually click, the page opens instantly with zero loading delay.",
+      explanationDeveloper: "Traditional prefetching only downloads raw HTML, requiring subsequent CSS/JS execution. The native Speculation Rules API allows the browser to fully prerender next-page subtrees in an invisible tab during user hover or touchstart ('eagerness: moderate'), driving internal LCP to 0ms with zero extra JavaScript runtime overhead.",
+      explanationAgency: "Cuts navigation LCP from 2.1s to effectively 0ms, delivering native mobile app smoothness on standard web browsers.",
+      explanationSaaSTeam: "Implement Speculation Rules for critical user conversion funnels.",
+      remediationCodeSnippet: `<!-- Inject into <head> or footer of your HTML templates: -->
+<script type="speculationrules">
+{
+  "prerender": [
+    {
+      "source": "document",
+      "where": {
+        "and": [
+          { "href_matches": "/products/*" },
+          { "not": { "href_matches": "/*add-to-cart*" } },
+          { "not": { "href_matches": "/*logout*" } },
+          { "not": { "selector_matches": ".no-prerender" } }
+        ]
+      },
+      "eagerness": "moderate"
+    }
+  ],
+  "prefetch": [
+    {
+      "source": "document",
+      "where": { "href_matches": "/blog/*" },
+      "eagerness": "conservative"
+    }
+  ]
+}
+</script>`,
+      implementationSteps: [
+        "Add the <script type='speculationrules'> JSON block to your global layout header",
+        "Configure 'eagerness': 'moderate' for high-value conversion pages (prerenders on link hover)",
+        "Exclude transactional or dynamic auth routes (checkout, cart, logout) to prevent premature session modifications",
+      ],
+      verificationSteps: [
+        "In Chrome DevTools: Navigate to Application > Preloading > Speculations: verify hovered links transition to 'Ready' status",
+        "Re-run SpeedPilot audit to verify internal LCP drops to < 100ms",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 59. WordPress Performance Lab Modern Image Formats
+  {
+    id: "wordpress-performance-lab-modern-image-formats",
+    issueCode: "modern-image-formats",
+    techStack: "WORDPRESS",
+    title: "Generate Modern AVIF & WebP Sub-sizes Automatically via Core Filters",
+    inputDescription: "Target: https://travel-journal.org - Flagged: 3.4MB unoptimized JPEG and PNG media library uploads slowing mobile LCP",
+    flaggedAssets: ["https://travel-journal.org/wp-content/uploads/2026/04/mountain-hero.jpg"],
+    goldStandardOutput: {
+      detectedStack: "WORDPRESS",
+      explanationMarketer: "Your website uploads large camera photos in older formats. Modern formats like AVIF compress images up to 70% smaller with identical visual clarity, making photos load instantly on phones without eating visitor cellular data.",
+      explanationDeveloper: "WordPress 6.5+ supports native AVIF image generation alongside WebP. Use the core 'image_editor_output_format' filter hook to instruct the GD / Imagick editor to output modern AVIF and WebP sub-sizes automatically on upload, while maintaining standard JPEG fallbacks for legacy browsers.",
+      explanationAgency: "Saves 50% to 75% in total image bandwidth across the entire media catalog, drastically improving Google PageSpeed scores.",
+      explanationSaaSTeam: "Add automated AVIF/WebP generation hook to WordPress mu-plugins.",
+      remediationCodeSnippet: `// In functions.php or wp-content/mu-plugins/performance-images.php:
+
+// 1. Instruct WordPress to generate modern formats (AVIF primary, WebP secondary):
+add_filter('image_editor_output_format', function($formats) {
+    // If GD or Imagick supports AVIF, set AVIF as output for JPEG and PNG:
+    $formats['image/jpeg'] = 'image/avif';
+    $formats['image/png']  = 'image/avif';
+    return $formats;
+});
+
+// 2. Set optimal compression quality for next-gen formats:
+add_filter('wp_editor_set_quality', function($quality, $mime_type) {
+    if ($mime_type === 'image/avif') {
+        return 80; // AVIF at 80 quality achieves 65%+ savings over 90 JPEG
+    }
+    if ($mime_type === 'image/webp') {
+        return 82;
+    }
+    return $quality;
+}, 10, 2);
+
+// 3. Ensure modern MIME types are permitted in uploads:
+add_filter('upload_mimes', function($mimes) {
+    $mimes['avif'] = 'image/avif';
+    $mimes['webp'] = 'image/webp';
+    return $mimes;
+});`,
+      implementationSteps: [
+        "Ensure server PHP installation has ImageMagick with libheif/libavif support compiled (standard on PHP 8.1+)",
+        "Add the filter hooks inside a custom mu-plugin: wp-content/mu-plugins/performance-images.php",
+        "Regenerate existing thumbnails using WP-CLI: 'wp media regenerate --yes'",
+      ],
+      verificationSteps: [
+        "Upload a sample test JPEG in WP Admin: verify in wp-content/uploads that .avif files are generated",
+        "Re-run SpeedPilot audit to verify modern-image-formats audit passes with 100% green check",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 60. Next.js Modularize Imports & Tree Shaking for Barrel Files
+  {
+    id: "nextjs-modularize-imports-tree-shaking",
+    issueCode: "unused-javascript",
+    techStack: "NEXTJS",
+    title: "Eliminate Barrel File Bloat with optimizePackageImports in Next.js",
+    inputDescription: "Target: https://analytics-saas.com - Flagged: 890KB of unused icons and utility functions loaded because of barrel index.js re-exports",
+    flaggedAssets: ["https://analytics-saas.com/_next/static/chunks/app/dashboard/page.js"],
+    goldStandardOutput: {
+      detectedStack: "NEXTJS",
+      explanationMarketer: "Your dashboard only needs two or three small icons, but the application is downloading hundreds of unused icons and graphs behind the scenes because of how packages are imported, adding unnecessary loading delay.",
+      explanationDeveloper: "Barrel files (libraries that re-export hundreds of modules from a single 'index.js', such as @heroicons/react, lucide-react, or lodash) defeat basic bundler tree-shaking, ballooning bundle size. Configure Next.js 'optimizePackageImports' in next.config.mjs to rewrite imports into direct module paths during compilation.",
+      explanationAgency: "Instantly sheds 400KB to 900KB of unused JavaScript from client bundles without changing any application code.",
+      explanationSaaSTeam: "Add all icon and component libraries to optimizePackageImports in next.config.mjs.",
+      remediationCodeSnippet: `// In next.config.mjs:
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Automatically optimizes barrel file imports into direct file imports:
+  experimental: {
+    optimizePackageImports: [
+      'lucide-react',
+      '@heroicons/react/24/outline',
+      '@heroicons/react/24/solid',
+      'date-fns',
+      'lodash-es',
+      '@radix-ui/react-icons',
+    ],
+  },
+};
+
+export default nextConfig;
+
+// Before: 'import { Check, AlertCircle } from "lucide-react";' bundled all icons
+// After compilation: Next.js automatically rewrites to:
+// 'import Check from "lucide-react/dist/esm/icons/check";'
+// 'import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";'`,
+      implementationSteps: [
+        "Open next.config.mjs and add experimental: { optimizePackageImports: [...] } with your heavy icon/utility packages",
+        "Run 'npm run build' and compare the First Load JS sizes in the Next.js build output",
+        "Verify all icons and components continue to render with identical styling",
+      ],
+      verificationSteps: [
+        "Inspect Next.js build output: confirm dashboard First Load JS shrinks by 200KB+",
+        "Re-run SpeedPilot audit to verify unused-javascript score improves significantly",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 61. WooCommerce HPOS (High-Performance Order Storage)
+  {
+    id: "woocommerce-hpos-order-storage-ttfb",
+    issueCode: "server-response-time",
+    techStack: "WOOCOMMERCE",
+    title: "Migrate WooCommerce to High-Performance Order Storage (HPOS) to Fix Checkout TTFB",
+    inputDescription: "Target: https://luxury-apparel.com/checkout/ - Flagged: 1,600ms TTFB caused by concurrent database row-locks on wp_posts and wp_postmeta tables during flash sales",
+    flaggedAssets: ["https://luxury-apparel.com/checkout/"],
+    goldStandardOutput: {
+      detectedStack: "WOOCOMMERCE",
+      explanationMarketer: "During high-traffic promotions, your checkout slows down to a crawl because older shopping cart software jams all orders into your general blog database tables. Migrating to dedicated order tables keeps checkout lightning-fast even during flash sales.",
+      explanationDeveloper: "WooCommerce's legacy post-table storage forces orders into 'wp_posts' and 'wp_postmeta', causing severe table locking under concurrent checkout requests. Enable High-Performance Order Storage (HPOS) to move orders into dedicated, indexed SQL tables ('wp_wc_orders'), dropping checkout TTFB from 1.6s to under 250ms.",
+      explanationAgency: "Eliminates database deadlocks during flash campaigns, preventing checkout drop-offs and dramatically boosting mobile purchase conversions.",
+      explanationSaaSTeam: "Enable HPOS across all WooCommerce production environments and migrate order data via WP-CLI.",
+      remediationCodeSnippet: `# 1. Run HPOS migration via WP-CLI (safe for production):
+wp wc cot enable --yes
+wp wc cot count-unmigrated
+wp wc cot sync --batch-size=500
+
+# 2. In functions.php: Declare theme compatibility for HPOS:
+add_action('before_woocommerce_init', function() {
+    if (class_exists(\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil::class)) {
+        \\Automattic\\WooCommerce\\Utilities\\FeaturesUtil::declare_compatibility(
+            'custom_order_tables',
+            __FILE__,
+            true
+        );
+    }
+});
+
+# 3. In wp-config.php: Verify Redis persistent object caching is active:
+define('WP_REDIS_SCHEME', 'tcp');
+define('WP_REDIS_HOST', '127.0.0.1');
+define('WP_REDIS_PORT', 6379);
+define('WP_REDIS_TIMEOUT', 1);
+define('WP_REDIS_READ_TIMEOUT', 1);`,
+      implementationSteps: [
+        "Declare theme compatibility for 'custom_order_tables' inside functions.php before WooCommerce boots",
+        "In WooCommerce Settings > Advanced > Features: Enable 'High-performance order storage'",
+        "Run 'wp wc cot sync' to batch-migrate legacy orders without downtime",
+      ],
+      verificationSteps: [
+        "Inspect WooCommerce status page: verify Order data storage is set to 'High-performance order storage (COT)'",
+        "Re-run SpeedPilot audit on checkout: verify server-response-time drops to < 300ms",
+      ],
+      estimatedDifficulty: "MEDIUM",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 62. Next.js 15 Partial Prerendering (PPR) with Dynamic IO
+  {
+    id: "nextjs-ppr-dynamic-io-streaming-ttfb",
+    issueCode: "server-response-time",
+    techStack: "NEXTJS",
+    title: "Enable Next.js 15 Partial Prerendering (PPR) and Dynamic IO for Instant Edge TTFB",
+    inputDescription: "Target: https://saas-metrics.io/dashboard - Flagged: Entire layout de-opts to slow dynamic SSR (890ms TTFB) because user authentication cookies are accessed in server component",
+    flaggedAssets: ["https://saas-metrics.io/dashboard"],
+    goldStandardOutput: {
+      detectedStack: "NEXTJS",
+      explanationMarketer: "Because the application checks who is logged in, the server holds back the entire page for nearly a second before sending anything. Partial Prerendering serves the navigation bar and layout instantly from Edge servers in 20ms while loading user data seamlessly in the background.",
+      explanationDeveloper: "Reading cookies() or headers() at the page root in Next.js de-optimizes the entire route into dynamic server-rendered HTML. With Next.js 15 Partial Prerendering (PPR) and 'dynamicIO: true', the static shell is served in under 30ms from Cloudflare/Vercel Edge, while the dynamic authenticated widgets stream via React Suspense boundaries.",
+      explanationAgency: "Cuts Time to First Byte (TTFB) on authenticated web applications from 890ms to an ultra-fast 25ms.",
+      explanationSaaSTeam: "Adopt Next.js 15 PPR architecture across all dashboard and authenticated customer portals.",
+      remediationCodeSnippet: `// 1. In next.config.mjs:
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    ppr: 'incremental', // Enable Partial Prerendering incrementally
+    dynamicIO: true,      // Separate dynamic data access from static layout
+  },
+};
+export default nextConfig;
+
+// 2. In app/dashboard/page.tsx:
+import { Suspense } from 'react';
+import { cookies } from 'next/headers';
+
+export const experimental_ppr = true; // Mark route as PPR enabled
+
+// Static shell renders at build time / Edge CDN (< 30ms TTFB):
+export default function DashboardPage() {
+  return (
+    <div className="dashboard-layout">
+      <header className="static-navbar">
+        <h1>Overview</h1>
+      </header>
+
+      {/* Dynamic authenticated content streams into placeholder: */}
+      <Suspense fallback={<div className="h-64 animate-pulse bg-slate-800 rounded" />}>
+        <UserDynamicMetrics />
+      </Suspense>
+    </div>
+  );
+}
+
+// Dynamic component reads cookies without blocking static shell:
+async function UserDynamicMetrics() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth_token')?.value;
+  const metrics = await fetchMetrics(token);
+  return <MetricsGrid data={metrics} />;
+}`,
+      implementationSteps: [
+        "In next.config.mjs, enable experimental: { ppr: 'incremental', dynamicIO: true }",
+        "Add export const experimental_ppr = true; in dynamic route page.tsx files",
+        "Wrap any component accessing cookies(), headers(), or searchParams inside React <Suspense>",
+      ],
+      verificationSteps: [
+        "Run 'npm run build' and verify route symbol is marked with '◐ (Partial Prerender)'",
+        "Measure curl response: verify TTFB is < 50ms at edge",
+      ],
+      estimatedDifficulty: "MEDIUM",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 63. Shopify Cart Drawer Debounce & Optimistic DOM Updates
+  {
+    id: "shopify-cart-drawer-debounce-abort-inp",
+    issueCode: "interaction-to-next-paint",
+    techStack: "SHOPIFY",
+    title: "Implement Debounced Cart Updates with AbortController to Eliminate Drawer INP",
+    inputDescription: "Target: https://skincare-shop.myshopify.com - Flagged: Rapid quantity clicks (+ / -) in slide-out cart trigger 420ms INP lockups and out-of-order race conditions",
+    flaggedAssets: ["https://skincare-shop.myshopify.com/cdn/shop/t/2/assets/cart-drawer.js"],
+    goldStandardOutput: {
+      detectedStack: "SHOPIFY",
+      explanationMarketer: "When customers tap '+' or '-' in their shopping cart, the numbers freeze and stutter because every single tap sends a full request to Shopify. Optimistic instant updates make clicking buttery smooth with zero hesitation.",
+      explanationDeveloper: "Submitting /cart/change.js on every keystroke or click without debouncing creates a barrage of HTTP requests and main-thread lockups (> 400ms INP). Implement a 250ms debounce with an AbortController that cancels stale in-flight requests, optimistically updating the line-item total immediately in the DOM.",
+      explanationAgency: "Cuts Cart Drawer Interaction to Next Paint (INP) from 420ms to under 16ms, eliminating checkout friction.",
+      explanationSaaSTeam: "Enforce debounced optimistic cart updates in theme design system guidelines.",
+      remediationCodeSnippet: `// In assets/cart-drawer.js:
+class CartDrawerController {
+  constructor() {
+    this.debounceTimer = null;
+    this.abortController = null;
+  }
+
+  updateQuantity(lineKey, newQuantity) {
+    // 1. Instantly paint optimistic quantity & subtotal (< 16ms):
+    const inputEl = document.querySelector(\`input[data-line="\${lineKey}"]\`);
+    if (inputEl) inputEl.value = newQuantity;
+
+    // 2. Abort any previous pending request:
+    if (this.abortController) {
+      this.abortController.abort();
+    }
+    this.abortController = new AbortController();
+
+    // 3. Debounce network dispatch by 250ms:
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(async () => {
+      try {
+        const response = await fetch('/cart/change.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ id: lineKey, quantity: newQuantity }),
+          signal: this.abortController.signal,
+        });
+        const cartData = await response.json();
+        this.syncDrawerUI(cartData);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Cart sync failed:', err);
+        }
+      }
+    }, 250);
+  }
+
+  syncDrawerUI(cart) {
+    const totalEl = document.querySelector('.cart-subtotal-price');
+    if (totalEl) totalEl.textContent = formatMoney(cart.total_price);
+  }
+}`,
+      implementationSteps: [
+        "Wrap quantity adjustment event listeners inside CartDrawerController",
+        "Add AbortController instantiation to discard superseded API calls",
+        "Apply immediate DOM visual updates before the asynchronous fetch settles",
+      ],
+      verificationSteps: [
+        "In Chrome DevTools Performance panel, rapidly click '+' 5 times: verify INP stays green (< 40ms)",
+        "Check Network panel: verify only the final resolved request settles with HTTP 200",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 64. CSS Subgrid & Container Queries for Zero CLS
+  {
+    id: "custom-css-subgrid-container-queries-cls",
+    issueCode: "cumulative-layout-shift",
+    techStack: "CUSTOM",
+    title: "Prevent Dynamic Card Reflow Shifts with CSS Subgrid and Container Queries",
+    inputDescription: "Target: https://tech-news-feed.com - Flagged: 0.19 CLS in article masonry grid when titles of varying lengths cause neighboring cards to jump",
+    flaggedAssets: ["https://tech-news-feed.com/articles/archive"],
+    goldStandardOutput: {
+      detectedStack: "CUSTOM",
+      explanationMarketer: "As visitors scroll through news cards, shorter headlines and asynchronous badges cause cards next to them to violently jitter up and down, making users misclick articles. Subgrid locks all rows into perfect harmony.",
+      explanationDeveloper: "Varying content heights inside CSS grid items cause layout reflows (0.19 CLS) as fonts and images settle. Use modern CSS Subgrid ('grid-template-rows: subgrid') combined with 'container-type: inline-size' and 'contain: layout paint' so rows align across the entire grid without triggering cross-card reflows.",
+      explanationAgency: "Eliminates layout shift across all responsive card grids, driving Core Web Vitals CLS score to a perfect 0.00.",
+      explanationSaaSTeam: "Incorporate CSS Subgrid alignment standards into company UI design system.",
+      remediationCodeSnippet: `/* In styles/grid.css: */
+.article-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-auto-rows: auto;
+  gap: 1.5rem;
+}
+
+.article-card {
+  display: grid;
+  /* Card items inherit row tracks from parent grid: */
+  grid-template-rows: subgrid;
+  grid-row: span 4; /* [Image, Title, Excerpt, Footer] */
+  
+  /* Isolate layout shifts from affecting document: */
+  contain: layout paint;
+  container-type: inline-size;
+}
+
+.article-card-image {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  object-fit: cover;
+}
+
+.article-card-title {
+  /* Reserves fixed minimum line height: */
+  min-height: 3rem;
+  line-height: 1.5rem;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}`,
+      implementationSteps: [
+        "Apply 'grid-template-rows: subgrid' to cards inside CSS grid parents",
+        "Set 'contain: layout paint' on individual card containers to stop layout thrashing",
+        "Define explicit line-clamp and aspect-ratio on variable content slots",
+      ],
+      verificationSteps: [
+        "In Chrome DevTools, toggle CPU throttling to 4x slowdown: observe that card grid does not shift",
+        "Re-run SpeedPilot audit to verify cumulative-layout-shift drops to 0.00",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 65. React 19 Action State & Progressive Hydration
+  {
+    id: "react-use-action-state-zero-bundle-tbt",
+    issueCode: "total-blocking-time",
+    techStack: "REACT",
+    title: "Replace Heavy Form Validation Libraries with React 19 useActionState to Slash TBT",
+    inputDescription: "Target: https://portal-auth.dev - Flagged: 340KB of formik and yup JavaScript freezing main thread for 510ms during login hydration",
+    flaggedAssets: ["https://portal-auth.dev/register/form.js"],
+    goldStandardOutput: {
+      detectedStack: "REACT",
+      explanationMarketer: "Visitors trying to type into your signup form experience a noticeable half-second typing delay because the page is downloading bulky third-party form validation packages. React 19's built-in forms respond immediately with zero lag.",
+      explanationDeveloper: "Third-party form managers (Formik, React Hook Form + Yup) contribute over 300KB of client JavaScript execution during hydration. Migrate to native React 19 'useActionState' with HTML5 constraint validation, eliminating client-side bundle bloat and cutting TBT from 510ms to under 40ms.",
+      explanationAgency: "Sheds 300KB+ of unnecessary JavaScript from landing and signup flows, boosting user registration completion rates.",
+      explanationSaaSTeam: "Standardize on React 19 useActionState for all registration and checkout forms.",
+      remediationCodeSnippet: `'use client';
+
+import { useActionState } from 'react';
+import { registerUserAction } from '@/actions/auth';
+
+interface FormState {
+  error: string | null;
+  success: boolean;
+}
+
+const initialState: FormState = { error: null, success: false };
+
+export function RegisterForm() {
+  // Built-in React 19 form handling with zero external libraries:
+  const [state, formAction, isPending] = useActionState(
+    registerUserAction,
+    initialState
+  );
+
+  return (
+    <form action={formAction} className="space-y-4">
+      {state.error && <p className="text-red-500 text-sm">{state.error}</p>}
+      
+      <div>
+        <label htmlFor="email">Email</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          required
+          autoComplete="email"
+          className="input-field"
+        />
+      </div>
+
+      <button type="submit" disabled={isPending} className="btn-primary">
+        {isPending ? 'Creating Account...' : 'Sign Up'}
+      </button>
+    </form>
+  );
+}`,
+      implementationSteps: [
+        "Uninstall bulky form validation dependencies: npm uninstall formik yup",
+        "Refactor form component to use React 19 useActionState hook",
+        "Leverage native HTML5 input attributes (required, pattern, type='email') for instant browser validation",
+      ],
+      verificationSteps: [
+        "In Chrome DevTools Performance panel, measure Total Blocking Time: confirm TBT < 50ms",
+        "Re-run SpeedPilot audit to verify unused-javascript score improves by 20+ points",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 66. WordPress wp_options Autoloaded Rows Pruning
+  {
+    id: "wordpress-autoloaded-options-prune-ttfb",
+    issueCode: "server-response-time",
+    techStack: "WORDPRESS",
+    title: "Prune Bloated wp_options Autoloaded Rows to Cut MySQL Boot Overhead from TTFB",
+    inputDescription: "Target: https://high-volume-blog.com - Flagged: 840ms TTFB caused by 3.8MB of autoloaded data loaded into PHP memory on every single WordPress request",
+    flaggedAssets: ["https://high-volume-blog.com/wp-admin/admin-ajax.php"],
+    goldStandardOutput: {
+      detectedStack: "WORDPRESS",
+      explanationMarketer: "Over time, old and uninstalled plugins leave behind megabytes of junk data in your database. Because WordPress loads this data into memory on every single visitor hit, your server wastes almost a full second just starting up.",
+      explanationDeveloper: "WordPress executes 'SELECT option_name, option_value FROM wp_options WHERE autoload = 'yes'' on EVERY page load. When abandoned plugins leave large cached transients in wp_options, memory bloat causes 500ms+ TTFB delays. Clean orphaned transients and set autoload='no' on options larger than 50KB.",
+      explanationAgency: "Cuts PHP memory footprint by 75% and shaves 400ms-600ms off Time to First Byte across the entire website.",
+      explanationSaaSTeam: "Add automated autoload size monitoring and transient pruning to WP maintenance cron jobs.",
+      remediationCodeSnippet: `# 1. Identify large autoloaded options using WP-CLI:
+wp db query "SELECT option_name, LENGTH(option_value) AS size_bytes FROM wp_options WHERE autoload = 'yes' ORDER BY size_bytes DESC LIMIT 15;"
+
+# 2. Prune expired transients:
+wp transient delete --expired
+wp db query "DELETE FROM wp_options WHERE option_name LIKE ('_transient_%') OR option_name LIKE ('_site_transient_%');"
+
+# 3. Disable autoload on large remaining options (> 50KB):
+wp db query "UPDATE wp_options SET autoload = 'no' WHERE LENGTH(option_value) > 50000 AND option_name NOT IN ('rewrite_rules', 'active_plugins');"
+
+# 4. In functions.php: Add preventive cap on future autoload additions:
+add_filter('pre_add_option', function($value, $option, $autoload) {
+    if ($autoload === 'yes' && is_string($value) && strlen($value) > 20000) {
+        $autoload = 'no'; // Prevent accidental autoloading of large configs
+    }
+    return $value;
+}, 10, 3);`,
+      implementationSteps: [
+        "Run the SQL query to detect options exceeding 50,000 bytes",
+        "Clear orphaned transients and set autoload='no' on heavy plugin data",
+        "Add the preventive pre_add_option filter to prevent regression",
+      ],
+      verificationSteps: [
+        "Run 'wp db query \"SELECT SUM(LENGTH(option_value)) FROM wp_options WHERE autoload = \\'yes\\';\"' - verify total < 800KB",
+        "Re-run SpeedPilot audit to verify server-response-time drops to green (< 200ms)",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 67. Laravel Octane with Swoole / RoadRunner
+  {
+    id: "laravel-octane-swoole-memory-ttfb",
+    issueCode: "server-response-time",
+    techStack: "LARAVEL",
+    title: "Keep Application in RAM with Laravel Octane and Swoole for Sub-20ms TTFB",
+    inputDescription: "Target: https://api-fintech.laravel.app - Flagged: 380ms TTFB caused by PHP-FPM cold-booting Laravel service providers and database connections on each hit",
+    flaggedAssets: ["https://api-fintech.laravel.app/v1/feed"],
+    goldStandardOutput: {
+      detectedStack: "LARAVEL",
+      explanationMarketer: "Standard web hosting boots up the entire web application from scratch every time a customer loads a page, like restarting your computer before every click. Keeping the application alive in memory serves pages instantly in 15ms.",
+      explanationDeveloper: "Standard PHP-FPM destroys the entire execution state between HTTP requests, incurring 200ms+ of framework bootstrapping overhead. Laravel Octane with Swoole or RoadRunner maintains the framework, routing table, and dependency injection container warm in RAM, reducing server response time to under 20ms.",
+      explanationAgency: "Multiplies Laravel server throughput by 10x while cutting TTFB from 380ms down to a blistering 18ms.",
+      explanationSaaSTeam: "Migrate high-volume Laravel production services to Laravel Octane running on Docker/Supervisor.",
+      remediationCodeSnippet: `# 1. Install Laravel Octane via Composer:
+composer require laravel/octane
+php artisan octane:install --server=swoole
+
+# 2. In /etc/supervisor/conf.d/octane.conf: Run Octane with persistent workers:
+[program:octane]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/html/artisan octane:start --server=swoole --host=127.0.0.1 --port=8000 --workers=4 --task-workers=2 --max-requests=1000
+autostart=true
+autorestart=true
+user=www-data
+redirect_stderr=true
+stdout_logfile=/var/log/octane.log
+
+# 3. In Nginx configuration: Proxy directly to Octane memory socket:
+upstream octane {
+    server 127.0.0.1:8000;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api-fintech.laravel.app;
+
+    location / {
+        proxy_pass http://octane;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}`,
+      implementationSteps: [
+        "Install laravel/octane and choose Swoole or RoadRunner engine",
+        "Configure Supervisor process manager to maintain 4 active worker processes",
+        "Update Nginx to proxy HTTP requests directly to 127.0.0.1:8000",
+      ],
+      verificationSteps: [
+        "Benchmark with 'curl -o /dev/null -s -w \"Time: %{time_total}\\n\" https://api-fintech.laravel.app/v1/feed' - verify < 0.03s",
+        "Re-run SpeedPilot audit to verify server-response-time passes with 100% score",
+      ],
+      estimatedDifficulty: "HARD",
+      estimatedImpact: "HIGH",
+    },
+  },
+
+  // 68. Third-Party CMP Cookie Consent Banner Facade
+  {
+    id: "custom-cmp-consent-banner-facade-tbt",
+    issueCode: "third-party-summary",
+    techStack: "CUSTOM",
+    title: "Implement Lazy Facade for Cookie Consent Banners (Cookiebot/OneTrust) to Eliminate 500ms TBT",
+    inputDescription: "Target: https://enterprise-saas.com - Flagged: OneTrust / Cookiebot script loads 480KB of JavaScript and executes 540ms of blocking CPU time before first user interaction",
+    flaggedAssets: ["https://consent.cookiebot.com/uc.js"],
+    goldStandardOutput: {
+      detectedStack: "CUSTOM",
+      explanationMarketer: "Your cookie compliance pop-up is freezing the entire screen for half a second while loading heavy third-party legal software before visitors even decide to click. A lightweight facade banner complies 100% with privacy laws while keeping the site instant.",
+      explanationDeveloper: "Consent Management Platforms (OneTrust, Cookiebot) inject heavy scripts synchronously to parse tracking cookies on load, driving Total Blocking Time (TBT) over 500ms. Render a zero-dependency HTML/CSS consent banner immediately, and dynamically inject the heavy vendor SDK script only when the user interacts or clicks 'Manage Preferences'.",
+      explanationAgency: "Satisfies strict GDPR/CCPA privacy requirements while completely protecting Core Web Vitals and PageSpeed scores.",
+      explanationSaaSTeam: "Deploy the SpeedPilot CMP facade pattern across all customer-facing properties.",
+      remediationCodeSnippet: `<!-- 1. Lightweight Native CSS/HTML Banner (Zero JavaScript Blocking): -->
+<div id="consent-facade" class="consent-banner" style="display: none;">
+  <p>We use cookies to improve your experience. <button id="btn-manage-cookies">Manage Preferences</button></p>
+  <div class="consent-actions">
+    <button id="btn-accept-all" class="btn-primary">Accept All</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Check if consent has already been given:
+  if (!localStorage.getItem('user_consent_decision')) {
+    document.getElementById('consent-facade').style.display = 'flex';
+  }
+
+  // Load heavy vendor CMP only when user actively clicks 'Manage Preferences':
+  function loadVendorCMP() {
+    if (window._cmpLoaded) return;
+    window._cmpLoaded = true;
+    const s = document.createElement('script');
+    s.src = 'https://consent.cookiebot.com/uc.js';
+    s.setAttribute('data-cbid', '00000000-0000-0000-0000-000000000000');
+    s.async = true;
+    document.head.appendChild(s);
+  }
+
+  document.getElementById('btn-manage-cookies')?.addEventListener('click', loadVendorCMP, { once: true });
+  document.getElementById('btn-accept-all')?.addEventListener('click', function() {
+    localStorage.setItem('user_consent_decision', 'accepted');
+    document.getElementById('consent-facade').style.display = 'none';
+  });
+})();
+</script>`,
+      implementationSteps: [
+        "Replace synchronous CMP <script> in <head> with the zero-dependency facade HTML/CSS block",
+        "Store basic 'accept' decisions directly in localStorage to avoid recurring loads for returning visitors",
+        "Only inject the vendor SDK script when explicit granular cookie management is requested",
+      ],
+      verificationSteps: [
+        "Inspect DevTools Performance panel: verify initial load TBT drops from 540ms to < 20ms",
+        "Re-run SpeedPilot audit to verify third-party-summary and total-blocking-time audits pass green",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    },
+  },
 ];
 
 export function findBestTrainingExemplar(issueCode: string, techStack: TechStack): TrainingExemplar | undefined {

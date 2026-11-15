@@ -11,12 +11,11 @@ import {
   ArrowRight,
   ExternalLink,
 } from "lucide-react";
-import { RazorpayUpgradeButton } from "@/components/billing/RazorpayUpgradeButton";
 
 export const metadata: Metadata = {
-  title: "Pricing & Plans — SpeedPilot",
+  title: "Access & Plans — SpeedPilot",
   description:
-    "SpeedPilot plans: free community workspace, supporter passes, and agency tiers.",
+    "SpeedPilot is 100% free and open source during public preview. All features are unlocked.",
 };
 
 export default function PricingPage() {
@@ -26,13 +25,13 @@ export default function PricingPage() {
       <div className="text-center max-w-2xl mx-auto space-y-3">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
           <Heart className="w-3.5 h-3.5 fill-current" />
-          <span>Transparent &amp; Open Source</span>
+          <span>100% Free &amp; Open Source</span>
         </div>
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
-          Simple pricing. Support open source.
+          All features unlocked during public preview.
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Use the full open-source community edition for free, or unlock priority speed pipelines with a supporter or agency pass.
+          SpeedPilot is completely free for developers, marketers, agencies, and SaaS teams. No subscriptions, no payment gateways, and no credit card required.
         </p>
       </div>
 
@@ -46,7 +45,7 @@ export default function PricingPage() {
                 Community Edition
               </div>
               <div className="text-3xl font-extrabold font-mono mt-1">$0</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Free forever</div>
+              <div className="text-xs text-emerald-500 font-semibold mt-0.5">Free forever</div>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Complete access to bulk audits, Core Web Vitals telemetry, SEO crawlers, and AI code diffs.
@@ -54,7 +53,7 @@ export default function PricingPage() {
             <ul className="space-y-2 text-xs pt-2 border-t border-border/50">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Bulk URL, CSV &amp; Sitemap audits</span>
+                <span>Bulk URL, CSV &amp; Sitemap audits (500+ URLs)</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -78,86 +77,93 @@ export default function PricingPage() {
           </Link>
         </div>
 
-        {/* Tier 2: Community Supporter Pass */}
-        <div className="p-6 rounded-xl border-2 border-amber-500/40 bg-card shadow-lg flex flex-col justify-between space-y-6 relative">
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-black uppercase tracking-wider shadow-sm">
-            Supporter
+        {/* Tier 2: Public Preview Unlocked */}
+        <div className="p-6 rounded-xl border-2 border-emerald-500/40 bg-card shadow-lg flex flex-col justify-between space-y-6 relative">
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white uppercase tracking-wider shadow-sm">
+            Active Preview
           </div>
           <div className="space-y-4 pt-1">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                <Heart className="w-3.5 h-3.5 fill-current" />
-                <span>Community Supporter Pass</span>
+              <div className="text-xs font-semibold uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Advanced SEO &amp; SERP Suite</span>
               </div>
-              <div className="text-3xl font-extrabold font-mono mt-1">₹499 <span className="text-sm font-normal text-muted-foreground">one-time</span></div>
-              <div className="text-xs text-muted-foreground mt-0.5">Direct project contribution</div>
+              <div className="text-3xl font-extrabold font-mono mt-1">Unlocked <span className="text-sm font-normal text-muted-foreground">in Beta</span></div>
+              <div className="text-xs text-muted-foreground mt-0.5">Zero fees during public preview</div>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Support server costs, independent open-source development, and speed intelligence research.
+              Full access to the scratch-built SERP rank tracker, competitor spy, and live crawler inspection.
             </p>
             <ul className="space-y-2 text-xs pt-2 border-t border-border/50">
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>Directly supports project hosting &amp; maintenance</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>Zero-Cost Google SERP Rank Tracker</span>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>Supporter badge on project repo</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>Top 10 Competitor Speed Battles</span>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>Priority feature request consideration</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>Google People Also Ask (PAA) questions</span>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>Instant Razorpay checkout (Cards, UPI, Netbanking)</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>AI Rank-climbing action roadmaps</span>
               </li>
             </ul>
           </div>
-          <RazorpayUpgradeButton
-            planCode="STARTER"
-            label="Get Supporter Pass (₹499)"
-            className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
-          />
+          <Link
+            href="/seo"
+            className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition text-center flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Launch SEO Intelligence</span>
+          </Link>
         </div>
 
-        {/* Tier 3: Pro Pass */}
-        <div className="p-6 rounded-xl border border-primary/40 bg-card shadow-sm flex flex-col justify-between space-y-6">
+        {/* Tier 3: Agency & Open Source */}
+        <div className="p-6 rounded-xl border border-border bg-card shadow-sm flex flex-col justify-between space-y-6">
           <div className="space-y-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Pro &amp; Agency Pass</span>
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Agency &amp; Self-Hosted</span>
               </div>
-              <div className="text-3xl font-extrabold font-mono mt-1">$29 <span className="text-sm font-normal text-muted-foreground">/ month</span></div>
-              <div className="text-xs text-muted-foreground mt-0.5">High volume &amp; priority quotas</div>
+              <div className="text-3xl font-extrabold font-mono mt-1">Apache 2.0</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Open source code</div>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Designed for agencies managing dozens of client sites with automated cron monitoring and API keys.
+              Self-host on your own infrastructure or deploy with Docker Compose for complete data isolation.
             </p>
             <ul className="space-y-2 text-xs pt-2 border-t border-border/50">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span>Unlimited concurrent audits</span>
+                <span>White-label public client share portals</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span>Automated weekly/monthly audit cron</span>
+                <span>Automated CI/CD GitHub Action regression guard</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span>Programmatic Developer API Keys</span>
+                <span>Docker Compose container orchestration</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span>White-label PDF branding</span>
+                <span>Full TypeScript source code access</span>
               </li>
             </ul>
           </div>
-          <RazorpayUpgradeButton
-            planCode="PRO"
-            label="Upgrade with Razorpay"
-          />
+          <a
+            href="https://github.com/WebDevWithPritom/speedpilot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-2.5 rounded-lg border border-border bg-secondary text-foreground text-xs font-semibold hover:bg-secondary/80 transition text-center flex items-center justify-center gap-1.5"
+          >
+            <Github className="w-3.5 h-3.5" />
+            <span>View on GitHub</span>
+          </a>
         </div>
       </div>
 
@@ -166,10 +172,10 @@ export default function PricingPage() {
         <div className="space-y-1">
           <div className="text-sm font-bold flex items-center justify-center sm:justify-start gap-1.5">
             <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-            <span>Support the project for free by starring on GitHub</span>
+            <span>Support the project by starring on GitHub</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Every star helps developers discover SpeedPilot and drives faster feature updates.
+            Every star helps developers discover SpeedPilot and accelerates new feature releases.
           </p>
         </div>
         <a
@@ -179,8 +185,8 @@ export default function PricingPage() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-xs font-semibold hover:bg-secondary transition shrink-0"
         >
           <Github className="w-4 h-4" />
-          <span>Star WebDevWithPritom/speedpilot</span>
-          <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+          <span>Star on GitHub</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </a>
       </div>
     </div>

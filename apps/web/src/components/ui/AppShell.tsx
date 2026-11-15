@@ -46,9 +46,6 @@ export function AppShell({ isAuthenticated, initialUser, children }: AppShellPro
             <Link href="/features" className="text-muted-foreground hover:text-foreground transition hidden sm:inline">
               Features
             </Link>
-            <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition hidden sm:inline">
-              Pricing
-            </Link>
             <a
               href="https://github.com/WebDevWithPritom/speedpilot"
               target="_blank"

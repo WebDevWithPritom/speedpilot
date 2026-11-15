@@ -149,9 +149,15 @@ export function LandingPage() {
             <Link href="/features" className="hover:text-foreground transition">
               Features
             </Link>
-            <Link href="/pricing" className="hover:text-foreground transition">
-              Pricing &amp; Support
-            </Link>
+            <a
+              href="https://github.com/WebDevWithPritom/speedpilot"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition flex items-center gap-1"
+            >
+              <Github className="w-3.5 h-3.5" />
+              <span>GitHub</span>
+            </a>
             <a href="#comparison" className="hover:text-foreground transition">
               Before &amp; After
             </a>
@@ -238,11 +244,11 @@ export function LandingPage() {
                 <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               </a>
               <Link
-                href="/pricing"
+                href="/features"
                 className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-border bg-card text-sm font-semibold hover:bg-secondary transition"
               >
-                <Zap className="w-4 h-4 text-primary" />
-                <span>Pricing &amp; Plans</span>
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span>Explore Features</span>
               </Link>
             </div>
           </div>
@@ -526,19 +532,18 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Plans / Creator Supporter Pass */}
+      {/* Plans / Public Preview Access */}
       <section id="pricing" className="border-t border-border bg-card/40 py-16 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center max-w-xl mx-auto space-y-2">
             <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Transparent &amp; Open
+              100% Free &amp; Open Source
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Free community tier. Optional creator support.
+              All features unlocked during public preview
             </h2>
             <p className="text-sm text-muted-foreground">
-              SpeedPilot is free for individuals and teams. Support ongoing development or upgrade
-              to unlock verified high-speed pipelines and agency features.
+              SpeedPilot is free for individuals, agencies, and SaaS teams. Run bulk audits, crawl SEO architecture, and generate AI code diffs with zero subscriptions.
             </p>
           </div>
 
@@ -547,9 +552,9 @@ export function LandingPage() {
             <div className="p-6 rounded-2xl border border-border bg-card space-y-4 flex flex-col justify-between shadow-sm">
               <div className="space-y-3">
                 <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Free Community
+                  Core Auditing Engine
                 </div>
-                <div className="text-3xl font-extrabold font-mono">$0</div>
+                <div className="text-3xl font-extrabold font-mono">Free</div>
                 <p className="text-xs text-muted-foreground">
                   Complete access to bulk audits, Lighthouse metrics, SEO crawler, and AI diffs.
                 </p>
@@ -576,43 +581,43 @@ export function LandingPage() {
               </Link>
             </div>
 
-            {/* Supporter Tier */}
-            <div className="p-6 rounded-2xl border-2 border-amber-500/40 bg-card space-y-4 flex flex-col justify-between shadow-lg relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-black uppercase tracking-wider shadow-sm">
-                Recommended
+            {/* Public Preview Unlocked */}
+            <div className="p-6 rounded-2xl border-2 border-primary/40 bg-card space-y-4 flex flex-col justify-between shadow-lg relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold bg-primary text-primary-foreground uppercase tracking-wider shadow-sm">
+                All Features Unlocked
               </div>
               <div className="space-y-3 pt-1">
-                <div className="text-xs font-semibold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                  <Heart className="w-3.5 h-3.5 fill-current" />
-                  <span>Supporter Pass</span>
+                <div className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 fill-current" />
+                  <span>Public Preview</span>
                 </div>
                 <div className="text-3xl font-extrabold font-mono">
-                  ₹499 <span className="text-xs font-normal text-muted-foreground">one-time</span>
+                  $0 <span className="text-xs font-normal text-muted-foreground">unlocked</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Fuel open-source engineering, cloud bandwidth, and high-speed API endpoints.
+                  Universal SEO Intelligence, SERP ranking simulation, and multi-model AI remediation without paywalls.
                 </p>
                 <ul className="space-y-2 text-xs text-foreground pt-2">
                   <li className="flex items-center gap-2">
-                    <Heart className="w-3.5 h-3.5 text-rose-500 shrink-0 fill-rose-500" />
-                    <span>Direct open-source supporter badge</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>Universal SEO &amp; Spider architecture</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span>Priority feature requests on GitHub</span>
+                    <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>Live SERP Simulator &amp; Rank tracking</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span>Direct Razorpay checkout (Cards, UPI)</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>Deep Search Multi-Persona Intelligence</span>
                   </li>
                 </ul>
               </div>
               <Link
-                href="/pricing"
-                className="w-full py-2.5 rounded-xl bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition text-center flex items-center justify-center gap-1.5"
+                href="/audits/new"
+                className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition text-center flex items-center justify-center gap-1.5"
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>Get Supporter Pass</span>
+                <span>Start Auditing Now</span>
               </Link>
             </div>
 
@@ -671,9 +676,6 @@ export function LandingPage() {
             <Link href="/features" className="hover:text-foreground transition">
               Features
             </Link>
-            <Link href="/pricing" className="hover:text-foreground transition">
-              Pricing &amp; Support
-            </Link>
             <a
               href="https://github.com/WebDevWithPritom/speedpilot"
               target="_blank"
@@ -684,9 +686,9 @@ export function LandingPage() {
               <span>GitHub</span>
               <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
             </a>
-            <Link href="/pricing" className="flex items-center gap-1 hover:text-foreground transition text-primary">
+            <Link href="/audits/new" className="flex items-center gap-1 hover:text-foreground transition text-primary">
               <Zap className="w-3.5 h-3.5" />
-              <span>Pricing</span>
+              <span>Run Audit</span>
             </Link>
             <Link href="/login" className="hover:text-foreground transition">
               Sign In

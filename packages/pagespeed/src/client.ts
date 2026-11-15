@@ -1,7 +1,6 @@
 import { SingleDevice } from "@speedpilot/shared";
 import { GooglePSIConfig, ParsedPageSpeedResult } from "./types.js";
 import { parseGooglePSIResponse } from "./parser.js";
-import { generateDryRunSimulation } from "./simulation.js";
 
 export class PageSpeedAPIError extends Error {
   constructor(message: string, public readonly status?: number, public readonly details?: unknown) {
@@ -23,18 +22,11 @@ export class PageSpeedClient {
   }
 
   /**
-   * Runs a PageSpeed audit on a target URL for a given device.
-   * If Google rate limits unauthenticated requests (HTTP 429), times out on heavy media/video,
-   * or in dry-run mode, falls back to the deterministic testing simulation.
+   * Runs a PageSpeed audit on a target URL for a given device against Google PSI API.
+   * Throws PageSpeedAPIError on rate-limits, timeouts, or network failures.
    */
   async runAudit(url: string, device: SingleDevice): Promise<ParsedPageSpeedResult> {
     const activeApiKey = this.apiKey || process.env.GOOGLE_PAGESPEED_API_KEY;
-    const isDryRunExplicit = process.env.DRY_RUN === "true" || process.env.DRY_RUN_FALLBACK === "true";
-
-    if (isDryRunExplicit) {
-      console.log(`[PageSpeedClient] Dry-Run Mode active (DRY_RUN configured): Generating realistic benchmark for ${url} (${device})`);
-      return generateDryRunSimulation(url, device);
-    }
 
     const strategy = device === "MOBILE" ? "mobile" : "desktop";
     const endpoint = new URL(this.baseUrl);
@@ -47,7 +39,7 @@ export class PageSpeedClient {
     endpoint.searchParams.append("category", "best-practices");
     endpoint.searchParams.append("category", "seo");
     // Note: Do NOT append "agentic-browsing" to Google PSI! Google only accepts standard Lighthouse categories.
-    // SpeedPilot's proprietary Agentic Browsing Readiness score is evaluated in parser.ts & simulation.ts.
+    // SpeedPilot's proprietary Agentic Browsing Readiness score is evaluated deterministically in parser.ts.
 
     if (activeApiKey) {
       endpoint.searchParams.set("key", activeApiKey);
@@ -73,23 +65,36 @@ export class PageSpeedClient {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          // If Google returns 429 (Rate limit) or 500/502/504 (Google crawler failed to load target page/firewall),
-          // fallback to simulation so the bulk audit continues gracefully without failing user jobs!
-          if (response.status === 429 || response.status === 500 || response.status === 502 || response.status === 504) {
-            console.warn(
-              `[PageSpeedClient] Google API HTTP ${response.status} for ${url}. Using graceful benchmark fallback.`
-            );
-            return generateDryRunSimulation(url, device);
-          }
-
           if (response.status === 503 && attempts < maxAttempts) {
             await new Promise((resolve) => setTimeout(resolve, delay));
             delay *= 2;
             continue;
           }
 
-          console.warn(`[PageSpeedClient] Non-recoverable Google API HTTP ${response.status} for ${url}. Falling back to benchmark simulation.`);
-          return generateDryRunSimulation(url, device);
+          if (response.status === 429) {
+            throw new PageSpeedAPIError(
+              `Google PageSpeed Insights API rate limit reached (HTTP 429). Please add your Google API key in Settings or retry shortly.`,
+              429
+            );
+          }
+
+          let errDetail = "";
+          try {
+            const errData = await response.json();
+            errDetail = errData?.error?.message ? `: ${errData.error.message}` : "";
+          } catch { }
+
+          if (response.status === 400) {
+            throw new PageSpeedAPIError(
+              `Google PageSpeed could not inspect '${url}'${errDetail || " (Invalid URL or unreachable target)"}.`,
+              400
+            );
+          }
+
+          throw new PageSpeedAPIError(
+            `Google PageSpeed Insights returned HTTP ${response.status}${errDetail}. Target site may be blocking Google's crawler.`,
+            response.status
+          );
         }
 
         const rawData = await response.json();
@@ -97,24 +102,25 @@ export class PageSpeedClient {
       } catch (err: unknown) {
         clearTimeout(timeoutId);
         if (err instanceof PageSpeedAPIError) throw err;
-        
+
         if ((err as Error).name === "AbortError") {
-          console.warn(
-            `[PageSpeedClient] Google PageSpeed audit for '${url}' timed out after ${this.timeoutMs}ms (remote Lighthouse runner reached deadline on heavy media/stream assets). Falling back to realistic telemetry benchmark simulation.`
+          throw new PageSpeedAPIError(
+            `Google PageSpeed audit for '${url}' timed out after ${this.timeoutMs}ms. Remote Lighthouse runner reached deadline.`,
+            408
           );
-          return generateDryRunSimulation(url, device);
         }
-        
+
         if (attempts >= maxAttempts) {
-          // Fallback to simulation if Google API is unreachable in test mode
-          console.warn(`[PageSpeedClient] Google API error: ${(err as Error).message}. Falling back to dry-run simulation.`);
-          return generateDryRunSimulation(url, device);
+          throw new PageSpeedAPIError(
+            `Google PageSpeed Insights API request failed for '${url}': ${(err as Error).message}`,
+            500
+          );
         }
         await new Promise((resolve) => setTimeout(resolve, delay));
         delay *= 2;
       }
     }
 
-    return generateDryRunSimulation(url, device);
+    throw new PageSpeedAPIError(`Google PageSpeed audit failed for '${url}' after ${maxAttempts} attempts.`, 500);
   }
 }

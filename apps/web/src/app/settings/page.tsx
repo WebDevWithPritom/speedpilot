@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { RazorpayUpgradeButton } from "@/components/billing/RazorpayUpgradeButton";
 import {
   ShieldCheck,
   Key,
@@ -744,11 +743,11 @@ export default function SettingsPage() {
               </li>
             </ul>
 
-            <div className="pt-3" onClick={(e) => e.stopPropagation()}>
-              <RazorpayUpgradeButton
-                planCode="PRO"
-                label="Upgrade to Pro with Razorpay (₹2,900 / $29)"
-              />
+            <div className="pt-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-xs border border-emerald-500/20">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>All Features Unlocked (Public Preview)</span>
+              </span>
             </div>
           </div>
         </div>

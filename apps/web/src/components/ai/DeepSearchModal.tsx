@@ -159,8 +159,16 @@ export function DeepSearchModal({
               <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary text-secondary-foreground font-semibold">
                 {techStack}
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 font-semibold border border-emerald-500/25">
-                SERP Rank #{marketer?.currentSearchRank ?? 4}
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border ${
+                typeof marketer?.currentSearchRank === "number" && marketer.currentSearchRank > 0
+                  ? "bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/25"
+                  : "bg-secondary text-muted-foreground border-border"
+              }`}>
+                {loading
+                  ? "Checking SERP..."
+                  : typeof marketer?.currentSearchRank === "number" && marketer.currentSearchRank > 0
+                  ? `SERP Rank #${marketer.currentSearchRank}`
+                  : "SERP: Unranked"}
               </span>
             </h2>
             <p className="text-xs text-muted-foreground font-mono truncate max-w-lg mt-0.5">
@@ -317,33 +325,31 @@ export function DeepSearchModal({
                   {/* Prominent Current Search Rank, Keyword & Real Testing Action Bar */}
                   {(() => {
                     const currentKw = marketer.currentSearchKeyword || extractKeyword(targetUrl);
-                    const rankNum = marketer.currentSearchRank ?? 4;
-                    // Generate 14-day backdates overview
-                    const backdateSnapshots = [
-                      { label: "14d Ago", date: new Date(Date.now() - 14 * 86400000).toLocaleDateString([], { month: "short", day: "numeric" }), rank: rankNum + 4, delta: null },
-                      { label: "10d Ago", date: new Date(Date.now() - 10 * 86400000).toLocaleDateString([], { month: "short", day: "numeric" }), rank: rankNum + 3, delta: +1 },
-                      { label: "7d Ago", date: new Date(Date.now() - 7 * 86400000).toLocaleDateString([], { month: "short", day: "numeric" }), rank: rankNum + 2, delta: +1 },
-                      { label: "3d Ago", date: new Date(Date.now() - 3 * 86400000).toLocaleDateString([], { month: "short", day: "numeric" }), rank: rankNum + 1, delta: +1 },
-                      { label: "Today", date: "Now", rank: rankNum, delta: +1 },
-                    ];
+                    const rankNum = marketer.currentSearchRank;
+                    const isRanked = typeof rankNum === "number" && rankNum > 0;
 
                     return (
                       <>
                         <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/30 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
                           <div className="flex items-center gap-3.5">
-                            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-mono font-black text-2xl shrink-0 shadow-inner">
-                              #{rankNum}
+                            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-mono font-black text-xl shrink-0 shadow-inner">
+                              {isRanked ? `#${rankNum}` : "UR"}
                             </div>
                             <div>
                               <div className="text-[11px] font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
                                 <Search className="w-3.5 h-3.5 text-emerald-500" />
-                                <span>Current Google Search Rank</span>
+                                <span>{isRanked ? "Live Verified Search Rank" : "SERP Search Position"}</span>
                               </div>
                               <div className="text-sm font-bold text-foreground flex items-center gap-2 mt-0.5">
                                 <span>Target Keyword:</span>
                                 <span className="font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-xs">
                                   "{currentKw}"
                                 </span>
+                              </div>
+                              <div className="text-[11px] text-muted-foreground mt-0.5">
+                                {isRanked
+                                  ? `Verified rank #${rankNum} on Google/Web Search (live network fetch)`
+                                  : "Unranked in top search results • High organic optimization opportunity"}
                               </div>
                             </div>
                           </div>
@@ -382,33 +388,40 @@ export function DeepSearchModal({
                           </div>
                         </div>
 
-                        {/* Backdates SERP Trajectory Overview Card */}
+                        {/* Real-time SERP Verification Card */}
                         <div className="p-3.5 rounded-xl border border-border bg-card/60 space-y-2">
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold text-foreground flex items-center gap-1.5">
                               <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                              Backdates SERP Ranking Overview (14-Day Trajectory)
+                              Live SERP Ranking Verification
                             </span>
-                            <span className="text-[11px] text-emerald-500 font-semibold">
-                              📈 Net Gain: +4 positions climbed
+                            <span className="text-[11px] text-muted-foreground font-mono">
+                              Checked: Just now (Live network check)
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-5 gap-2 pt-1">
-                            {backdateSnapshots.map((snap, sIdx) => (
-                              <div
-                                key={sIdx}
-                                className={`p-2 rounded-lg border text-center transition ${
-                                  snap.label === "Today"
-                                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-500 font-bold"
-                                    : "bg-secondary/20 border-border text-muted-foreground"
-                                }`}
-                              >
-                                <div className="text-[10px] uppercase font-semibold">{snap.label}</div>
-                                <div className="text-base font-black font-mono my-0.5">#{snap.rank}</div>
-                                <div className="text-[10px] text-muted-foreground">{snap.date}</div>
+                          <div className="p-3 rounded-lg bg-secondary/30 border border-border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <div className="font-semibold text-foreground">
+                                {isRanked
+                                  ? `Verified Position: #${rankNum} in top search results`
+                                  : "Status: Unranked in top 10 search results"}
                               </div>
-                            ))}
+                              <div className="text-muted-foreground text-[11px] mt-0.5">
+                                {isRanked
+                                  ? `Target URL matches live search results for query "${currentKw}".`
+                                  : `Target URL was not found in top 10 results for "${currentKw}". Track in SEO Command Center for automated ranking scans.`}
+                              </div>
+                            </div>
+                            <div className="shrink-0">
+                              <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                                isRanked
+                                  ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                                  : "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                              }`}>
+                                {isRanked ? `Page 1 • Rank #${rankNum}` : "Unranked / Opportunity"}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </>
@@ -423,7 +436,7 @@ export function DeepSearchModal({
                         {marketer.serpRankRisk}
                       </div>
                       <div className="text-[10px] text-muted-foreground mt-1">
-                        Ranked #{marketer.currentSearchRank ?? 4} • Drop risk: -4 to -8 pos
+                        {marketer.currentSearchRank ? `Ranked #${marketer.currentSearchRank} • High ranking risk if unoptimized` : "Core Web Vitals latency directly impacts rank potential"}
                       </div>
                     </div>
 

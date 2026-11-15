@@ -15,7 +15,7 @@
 
 - **Production URL:** [https://speedpilot.webdevwithpritom.com](https://speedpilot.webdevwithpritom.com)
 - **Instant 1-Click Speed Test:** Test any public URL on the homepage without login.
-- **Pricing & Pro Passes:** [View Pricing & Plans](https://speedpilot.webdevwithpritom.com/pricing)
+- **License & Access:** 100% Free & Open Source during Public Preview (All Features Unlocked)
 
 ---
 
@@ -31,7 +31,7 @@ SpeedPilot runs multi-page Lighthouse, CrUX, and SEO audits in bulk, tracks SERP
 6. **AI CI/CD Regression Guard & PR Bot:** Official composite GitHub Action (`action.yml`) evaluating Core Web Vitals budgets on pull requests and posting automated markdown scorecards with `.patch` fixes.
 7. **Context-Aware AI Code Fixes:** Framework-specific code diffs for Next.js, React, WordPress, WooCommerce, Shopify, or Laravel with signature caching.
 8. **Multi-Persona Perspective Lens:** View every audit through 4 dedicated lenses: **Developer**, **Marketer**, **Agency**, or **SaaS Team**.
-9. **Monetization & Agency Passes:** Built-in Razorpay checkout supporting UPI, QR, Cards, and Netbanking for Community Supporter (₹499), Pro, and Agency passes.
+9. **100% Free & Open Source:** Full monorepo unlocked for developers and teams with Bring-Your-Own-Key (BYOK) support for Google PSI, Groq, Cerebras, and Ollama.
 10. **Executive Deliverables:** Export printer-ready branded HTML/PDF client summaries and CSV datasets.
 
 ---

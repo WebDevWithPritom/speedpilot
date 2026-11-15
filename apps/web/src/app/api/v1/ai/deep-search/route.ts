@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeDeepSearch, DeepSearchRequest } from "@speedpilot/ai-engine";
+import { executeDeepSearch, DeepSearchRequest, extractSearchKeyword } from "@speedpilot/ai-engine";
+import { trackSerpRank } from "@speedpilot/seo-engine";
 import { prisma } from "@speedpilot/database";
 
 export async function POST(req: NextRequest) {
@@ -49,8 +50,34 @@ export async function POST(req: NextRequest) {
               : ranking.currentRank <= 10
               ? `Page 1 on Google (Rank #${ranking.currentRank})`
               : `Page 2+ on Google (Rank #${ranking.currentRank})`;
+        } else {
+          // Perform real-time live SERP verification
+          const kw = result.marketer.currentSearchKeyword || extractSearchKeyword(body.targetUrl);
+          const liveSerp = await trackSerpRank({
+            keyword: kw,
+            targetDomain: host,
+          });
+
+          if (liveSerp && liveSerp.targetRank) {
+            result.marketer.currentSearchRank = liveSerp.targetRank;
+            result.marketer.currentSearchKeyword = kw;
+            result.marketer.serpPositionStatus =
+              liveSerp.targetRank === 1
+                ? "Rank #1 in Web Search • Top Result"
+                : liveSerp.targetRank <= 3
+                ? `Top 3 in Web Search (Rank #${liveSerp.targetRank})`
+                : `Page 1 in Web Search (Rank #${liveSerp.targetRank})`;
+          } else {
+            result.marketer.currentSearchRank = null;
+            result.marketer.currentSearchKeyword = kw;
+            result.marketer.serpPositionStatus = "Unranked in Top 10 • Optimization Needed";
+          }
         }
-      } catch {}
+      } catch (serpErr) {
+        console.warn("[DeepSearchAPI] Live SERP check error:", serpErr);
+        result.marketer.currentSearchRank = null;
+        result.marketer.serpPositionStatus = "Unranked in Top 10 • Optimization Needed";
+      }
     }
 
     return NextResponse.json({

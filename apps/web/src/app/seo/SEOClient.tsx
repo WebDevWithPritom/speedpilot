@@ -3208,9 +3208,8 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
         const prevRank = kw.previousRank;
         const targetUrl = kw.targetUrl || `https://${kw.targetDomain}`;
 
-        // Build chronological backdates ledger (using actual history, or backfilling 14 daily snapshots if new)
+        // Build chronological backdates ledger from verified historical checkpoints
         const rawHistory = Array.isArray(kw.history) && kw.history.length > 0 ? kw.history : [];
-        const baseRank = curRank || 18;
 
         const timelineEntries: Array<{
           dateStr: string;
@@ -3220,11 +3219,19 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
           status: string;
         }> = [];
 
-        if (rawHistory.length >= 5) {
+        if (rawHistory.length > 0) {
           rawHistory.forEach((h: any, idx: number) => {
             const prevEntry = idx > 0 ? rawHistory[idx - 1] : null;
             const delta = prevEntry && prevEntry.rank != null && h.rank != null ? prevEntry.rank - h.rank : null;
-            const status = h.rank === 1 ? "Rank #1 (Featured)" : h.rank && h.rank <= 3 ? "Top 3 (High CTR)" : h.rank && h.rank <= 10 ? "Page 1 on Google" : "Page 2+";
+            const status = h.rank === 1
+              ? "Rank #1 (Featured)"
+              : h.rank && h.rank <= 3
+              ? "Top 3 (High CTR)"
+              : h.rank && h.rank <= 10
+              ? "Page 1 on Google"
+              : h.rank
+              ? "Page 2+"
+              : "Unranked in Top 10";
             timelineEntries.push({
               dateStr: new Date(h.checkedAt).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
               rank: h.rank,
@@ -3234,26 +3241,28 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
             });
           });
         } else {
-          // RankStack daily backdate algorithm: generate 14-day historical trajectory
-          for (let i = 14; i >= 0; i--) {
-            const dateObj = new Date(Date.now() - i * 86400000);
-            const dateStr = i === 0 ? "Today (Latest Check)" : dateObj.toLocaleDateString([], { month: "short", day: "numeric" });
-            const jitter = Math.round(Math.sin(i * 0.5) * 2 + Math.cos(i * 0.3) * 1.5);
-            const simRank = i === 0 ? (curRank || baseRank) : Math.max(1, baseRank + jitter + Math.floor(i * 0.3));
-            const status = simRank === 1 ? "Rank #1 (Featured)" : simRank <= 3 ? "Top 3 (High CTR)" : simRank <= 10 ? "Page 1 on Google" : "Page 2+";
-            timelineEntries.push({
-              dateStr,
-              rank: simRank,
-              delta: i === 14 ? null : (i === 0 && prevRank != null && curRank != null ? prevRank - curRank : (jitter > 0 ? -1 : jitter < 0 ? +1 : 0)),
-              competitor: kw.topCompetitor || "Competitor",
-              status,
-            });
-          }
+          // Single real-time verified checkpoint
+          const status = curRank === 1
+            ? "Rank #1 (Featured)"
+            : curRank && curRank <= 3
+            ? "Top 3 (High CTR)"
+            : curRank && curRank <= 10
+            ? "Page 1 on Google"
+            : curRank
+            ? "Page 2+"
+            : "Unranked in Top 10";
+          timelineEntries.push({
+            dateStr: "Latest Network Check",
+            rank: curRank,
+            delta: prevRank != null && curRank != null ? prevRank - curRank : null,
+            competitor: kw.topCompetitor || "Market Competitor",
+            status,
+          });
         }
 
         const validRanks = timelineEntries.map((e) => e.rank).filter((r): r is number => r !== null);
-        const bestRank = validRanks.length > 0 ? Math.min(...validRanks) : (curRank || 1);
-        const avgRank = validRanks.length > 0 ? (validRanks.reduce((a, b) => a + b, 0) / validRanks.length).toFixed(1) : (curRank || 4);
+        const bestRank = validRanks.length > 0 ? Math.min(...validRanks) : (curRank || null);
+        const avgRank = validRanks.length > 0 ? (validRanks.reduce((a, b) => a + b, 0) / validRanks.length).toFixed(1) : (curRank != null ? String(curRank) : "N/A");
         const netMovement = validRanks.length >= 2 ? validRanks[0] - validRanks[validRanks.length - 1] : 0;
 
         return (
@@ -3356,7 +3365,7 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
                 <div className="p-3 rounded-lg border border-border bg-card">
                   <div className="text-[11px] font-semibold text-muted-foreground uppercase">Best Rank Recorded</div>
                   <div className="text-xl font-black font-mono mt-1 text-amber-500">
-                    #{bestRank}
+                    {bestRank != null ? `#${bestRank}` : "Unranked"}
                   </div>
                   <div className="text-[10px] text-muted-foreground">All-time peak</div>
                 </div>
@@ -3364,7 +3373,7 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
                 <div className="p-3 rounded-lg border border-border bg-card">
                   <div className="text-[11px] font-semibold text-muted-foreground uppercase">Average Position</div>
                   <div className="text-xl font-black font-mono mt-1 text-blue-500">
-                    #{avgRank}
+                    {avgRank !== "N/A" ? `#${avgRank}` : "N/A"}
                   </div>
                   <div className="text-[10px] text-muted-foreground">Rolling baseline</div>
                 </div>

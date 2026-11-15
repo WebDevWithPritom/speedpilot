@@ -145,10 +145,10 @@ export default function FeaturesPage() {
             Create Free Account
           </Link>
           <Link
-            href="/pricing"
+            href="/audits/new"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border bg-card text-sm font-semibold hover:bg-secondary transition"
           >
-            View Pricing &amp; Support
+            Start Auditing
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

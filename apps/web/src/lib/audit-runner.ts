@@ -140,28 +140,42 @@ export async function executeAuditAsync(
       }
     }
 
-    const createdIssues = await Promise.all(
-      allIssuesToPersist.map((issue) =>
-        prisma.auditIssue.create({
-          data: {
-            auditExecutionId: executionId,
-            code: issue.code,
-            title: issue.title,
-            category: issue.category,
-            severity: issue.severity,
-            displayValue: issue.displayValue,
-            evidenceDetails: issue.evidenceDetails,
-          },
-        })
-      )
-    );
+    if (allIssuesToPersist.length > 0) {
+      await prisma.auditIssue.createMany({
+        data: allIssuesToPersist.map((issue) => ({
+          auditExecutionId: executionId,
+          code: issue.code,
+          title: issue.title,
+          category: issue.category,
+          severity: issue.severity,
+          displayValue: issue.displayValue,
+          evidenceDetails: issue.evidenceDetails,
+        })),
+      });
+    }
+
+    const createdIssues = await prisma.auditIssue.findMany({
+      where: { auditExecutionId: executionId },
+    });
 
     const sevRank: Record<string, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
     const aiSynthTasks = createdIssues
-      .map((created, i) => ({ created, raw: allIssuesToPersist[i] }))
-      .filter((p) => Boolean(p.raw))
-      .sort((a, b) => (sevRank[b.raw.severity] || 0) - (sevRank[a.raw.severity] || 0))
-      .slice(0, 3);
+      .sort((a, b) => (sevRank[b.severity] || 0) - (sevRank[a.severity] || 0))
+      .slice(0, 3)
+      .map((created) => {
+        const found = allIssuesToPersist.find((raw) => raw.code === created.code);
+        return {
+          created,
+          raw: found || {
+            code: created.code,
+            title: created.title,
+            category: created.category as "PERFORMANCE" | "ACCESSIBILITY" | "BEST_PRACTICES" | "SEO" | "TECHNICAL_SEO",
+            severity: created.severity as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+            displayValue: created.displayValue || undefined,
+            evidenceDetails: created.evidenceDetails,
+          },
+        };
+      });
 
     await Promise.allSettled(
       aiSynthTasks.map(async ({ created, raw }) => {
@@ -256,11 +270,15 @@ export async function executeAuditAsync(
       include: { executions: { select: { status: true } } },
     });
 
-    const allFinished = updatedJob.executions.every((e) => e.status === "COMPLETED" || e.status === "FAILED");
+    const allFinished = updatedJob.executions.every((e) => e.status === "COMPLETED" || e.status === "FAILED" || e.status === "CANCELLED");
     if (allFinished) {
+      const anyFailed = updatedJob.executions.some((e) => e.status === "FAILED" || e.status === "CANCELLED");
       await prisma.auditJob.update({
         where: { id: jobId },
-        data: { status: "COMPLETED", completedAt: new Date() },
+        data: {
+          status: anyFailed ? "PARTIAL_FAILURE" : "COMPLETED",
+          completedAt: new Date(),
+        },
       });
     }
 
