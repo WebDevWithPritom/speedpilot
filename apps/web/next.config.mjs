@@ -19,7 +19,7 @@ if (fs.existsSync(rootEnvPath)) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: process.env.VERCEL ? undefined : "standalone",
+  output: process.env.BUILD_STANDALONE === "true" ? "standalone" : undefined,
   transpilePackages: [
     "@speedpilot/shared",
     "@speedpilot/security",

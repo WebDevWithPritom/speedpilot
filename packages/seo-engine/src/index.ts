@@ -4,3 +4,4 @@ export * from "./crawler.js";
 export * from "./agentic-crawler.js";
 export * from "./ai-recon.js";
 export * from "./serp-tracker.js";
+export * from "./diff-inspector.js";

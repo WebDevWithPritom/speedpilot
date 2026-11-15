@@ -9,7 +9,7 @@ export default async function TechnicalSEOPage() {
   const user = await getCurrentUser();
   const workspaceId = user?.workspaceId || (await getOrCreateDefaultWorkspace()).id;
 
-  const [projectsRaw, rawResults] = await Promise.all([
+  const [projectsRaw, rawResults, rawKeywords] = await Promise.all([
     prisma.project.findMany({
       where: { workspaceId },
       select: {
@@ -56,6 +56,17 @@ export default async function TechnicalSEOPage() {
         },
       },
     }),
+    prisma.keywordRanking.findMany({
+      where: {
+        project: { workspaceId },
+      },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        project: {
+          select: { id: true, name: true, primaryDomain: true },
+        },
+      },
+    }),
   ]);
 
   const projects: ProjectOption[] = projectsRaw.map((p) => ({
@@ -93,5 +104,26 @@ export default async function TechnicalSEOPage() {
     createdAt: s.createdAt.toISOString(),
   }));
 
-  return <SEOClient projects={projects} initialResults={initialResults} />;
+  const initialKeywords = rawKeywords.map((k) => ({
+    id: k.id,
+    projectId: k.projectId,
+    projectName: k.project?.name || "General",
+    keyword: k.keyword,
+    targetDomain: k.targetDomain,
+    currentRank: k.currentRank,
+    previousRank: k.previousRank,
+    targetUrl: k.targetUrl,
+    topCompetitor: k.topCompetitor,
+    topCompetitorUrl: k.topCompetitorUrl,
+    history: Array.isArray(k.history) ? (k.history as any) : [],
+    lastCheckedAt: k.lastCheckedAt.toISOString(),
+  }));
+
+  return (
+    <SEOClient
+      projects={projects}
+      initialResults={initialResults}
+      initialKeywords={initialKeywords}
+    />
+  );
 }

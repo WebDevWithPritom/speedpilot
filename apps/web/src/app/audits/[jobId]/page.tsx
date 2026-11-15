@@ -30,6 +30,11 @@ import {
   Loader2,
   Play,
   Pause,
+  FastForward,
+  Share2,
+  Lock,
+  Globe,
+  X,
 } from "lucide-react";
 import { MetricBadge } from "@/components/ui/MetricBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -65,6 +70,91 @@ export default function BulkAuditJobResultsPage() {
   const autoStartedRef = React.useRef(false);
   const isCancelledRef = React.useRef(false);
 
+  // White-Label Share Portal State
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareSaving, setShareSaving] = useState(false);
+  const [shareData, setShareData] = useState<{
+    isPublic: boolean;
+    shareToken: string | null;
+    clientName: string | null;
+    hasPassword: boolean;
+    shareUrl: string | null;
+  }>({
+    isPublic: false,
+    shareToken: null,
+    clientName: null,
+    hasPassword: false,
+    shareUrl: null,
+  });
+  const [clientNameInput, setClientNameInput] = useState("");
+  const [sharePasswordInput, setSharePasswordInput] = useState("");
+  const [copiedShareUrl, setCopiedShareUrl] = useState(false);
+
+  const fetchShareStatus = async () => {
+    try {
+      setShareLoading(true);
+      const res = await fetch(`/api/v1/audits/${jobId}/share`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setShareData(data.data);
+        setClientNameInput(data.data.clientName || "");
+      }
+    } catch (e) {
+      console.error("Error loading share info", e);
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const handleToggleShare = async (enabled: boolean) => {
+    try {
+      setShareSaving(true);
+      const res = await fetch(`/api/v1/audits/${jobId}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isPublic: enabled,
+          clientName: clientNameInput,
+          sharePassword: sharePasswordInput || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setShareData(data.data);
+        showToast(enabled ? "Public link activated!" : "Public access disabled.");
+      }
+    } catch {
+      showToast("Failed to update share settings");
+    } finally {
+      setShareSaving(false);
+    }
+  };
+
+  const handleSaveShareSettings = async () => {
+    try {
+      setShareSaving(true);
+      const res = await fetch(`/api/v1/audits/${jobId}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isPublic: shareData.isPublic,
+          clientName: clientNameInput,
+          sharePassword: sharePasswordInput || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setShareData(data.data);
+        showToast("Share settings saved!");
+      }
+    } catch {
+      showToast("Failed to save settings");
+    } finally {
+      setShareSaving(false);
+    }
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -83,14 +173,16 @@ export default function BulkAuditJobResultsPage() {
     }
   };
 
-  const handleResumeAudit = async (retryTimeouts = true) => {
+  const handleResumeAudit = async (singleBatch = false) => {
     if (resuming) return;
     setResuming(true);
     isCancelledRef.current = false;
     const initialCompleted = jobData?.progress?.completed || 0;
     const initialTotal = jobData?.progress?.total || 1;
     setResumeProgressMsg(
-      `⚡ Auto-processing bulk audit (${initialCompleted} of ${initialTotal} completed)...`
+      singleBatch
+        ? `⚡ Processing next batch (${initialCompleted} of ${initialTotal} completed)...`
+        : `⚡ Auto-processing bulk audit (${initialCompleted} of ${initialTotal} completed)...`
     );
     try {
       let isDone = false;
@@ -120,8 +212,10 @@ export default function BulkAuditJobResultsPage() {
         const completed = batchData.totalCompleted || 0;
         const total = batchData.totalUrls || 1;
         const remaining = batchData.remainingQueued;
+        batchCount++;
+
         setResumeProgressMsg(
-          `⚡ Auto-processing: ${completed} of ${total} completed (${remaining} remaining in background)...`
+          `⚡ Batch #${batchCount} complete: ${completed} of ${total} finished (${remaining} remaining)...`
         );
 
         setJobData((prev: any) => {
@@ -137,14 +231,17 @@ export default function BulkAuditJobResultsPage() {
           };
         });
 
-        batchCount++;
-        // Refresh full table telemetry every 3 batches or when completed
-        if (batchCount % 3 === 0 || batchData.isAllFinished || remaining === 0) {
-          await fetchJobStatus();
-        }
+        // Immediately refresh full table telemetry on every micro-batch
+        await fetchJobStatus();
 
         if (batchData.isAllFinished || remaining === 0) {
           isDone = true;
+          break;
+        }
+
+        if (singleBatch) {
+          isDone = true;
+          showToast(`⚡ Batch completed: ${completed} of ${total} URLs finished (${remaining} remaining)`);
           break;
         }
 
@@ -162,21 +259,21 @@ export default function BulkAuditJobResultsPage() {
         await new Promise((r) => setTimeout(r, 200));
       }
 
-      if (!isCancelledRef.current) {
+      if (!isCancelledRef.current && !singleBatch) {
         showToast("🎉 All audit executions have completed!");
       }
     } catch (err: unknown) {
       console.error("Auto-resume error:", err);
-      showToast("Auto-processing will retry momentarily...");
-      if (!isCancelledRef.current) {
+      showToast("Batch processing encountered a temporary hiccup, retrying momentarily...");
+      if (!isCancelledRef.current && !singleBatch) {
         setTimeout(() => {
-          handleResumeAudit(true);
+          handleResumeAudit(false);
         }, 2500);
       }
     } finally {
       setResuming(false);
       setResumeProgressMsg(null);
-      fetchJobStatus();
+      await fetchJobStatus();
     }
   };
 
@@ -201,7 +298,7 @@ export default function BulkAuditJobResultsPage() {
 
     if (isUnfinished) {
       autoStartedRef.current = true;
-      handleResumeAudit(true);
+      handleResumeAudit(false);
     }
   }, [jobData, loading, resuming]);
 
@@ -535,6 +632,18 @@ Exported from SpeedPilot SaaS Team Console`;
               {copiedAll ? "Copied!" : "Copy Data"}
             </button>
 
+            <button
+              type="button"
+              onClick={() => {
+                fetchShareStatus();
+                setShareModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded border border-border text-xs font-medium hover:bg-secondary transition flex items-center gap-1.5"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share</span>
+            </button>
+
             {resuming ? (
               <button
                 type="button"
@@ -549,14 +658,26 @@ Exported from SpeedPilot SaaS Team Console`;
                 <span>Pause Auto-Run</span>
               </button>
             ) : canResume ? (
-              <button
-                type="button"
-                onClick={() => handleResumeAudit(true)}
-                className="px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 text-xs font-semibold transition flex items-center gap-1.5"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Resume Audit</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleResumeAudit(false)}
+                  className="px-3 py-1.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 text-xs font-semibold transition flex items-center gap-1.5"
+                  title="Auto-run remaining URLs in background micro-batches"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Resume Audit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResumeAudit(true)}
+                  className="px-3 py-1.5 rounded border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold transition flex items-center gap-1.5"
+                  title="Process next batch of up to 6 URLs immediately"
+                >
+                  <FastForward className="w-3.5 h-3.5" />
+                  <span>Proceed Next Batch</span>
+                </button>
+              </div>
             ) : null}
 
             <button
@@ -622,7 +743,7 @@ Exported from SpeedPilot SaaS Team Console`;
               ⚡ Running micro-batches safely within serverless limits. Progress updates live automatically until 100% complete.
             </div>
           </div>
-        ) : jobData.progress.failed > 0 && (
+        ) : (canResume || jobData.progress.failed > 0) && (
           <div className="p-4 rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs space-y-2">
             <div className="font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
@@ -634,14 +755,24 @@ Exported from SpeedPilot SaaS Team Console`;
                 </span>
               </div>
               {canResume && (
-                <button
-                  type="button"
-                  onClick={() => handleResumeAudit(true)}
-                  className="px-3.5 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center gap-1.5 shadow-xs shrink-0"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Resume Audit (Auto-Process Remaining URLs)</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleResumeAudit(false)}
+                    className="px-3.5 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center gap-1.5 shadow-xs shrink-0"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Auto-Process All Remaining</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResumeAudit(true)}
+                    className="px-3.5 py-1.5 rounded border border-border bg-background hover:bg-secondary text-foreground font-semibold text-xs transition flex items-center gap-1.5 shadow-xs shrink-0"
+                  >
+                    <FastForward className="w-3.5 h-3.5 text-primary" />
+                    <span>Proceed Next Batch</span>
+                  </button>
+                </div>
               )}
             </div>
             <p className="text-muted-foreground">
@@ -1299,6 +1430,176 @@ Exported from SpeedPilot SaaS Team Console`;
           issue={activeDeepSearchTarget.issue}
           initialPersona={persona}
         />
+      )}
+
+      {/* White-Label Share Modal */}
+      {shareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl p-6 space-y-5 text-foreground relative">
+            <button
+              onClick={() => setShareModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <Share2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">White-Label Client Portal</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Generate a clean, zero-login shareable audit report for clients or stakeholders.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {shareLoading ? (
+              <div className="py-10 text-center space-y-2">
+                <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
+                <p className="text-xs text-muted-foreground">Loading share configuration...</p>
+              </div>
+            ) : (
+              <div className="space-y-4 text-xs">
+                {/* Active / Inactive Toggle Banner */}
+                <div className="flex items-center justify-between p-3.5 rounded-lg border border-border bg-secondary/30">
+                  <div className="flex items-center gap-2.5">
+                    <Globe className={`w-4 h-4 ${shareData.isPublic ? "text-emerald-500" : "text-muted-foreground"}`} />
+                    <div>
+                      <div className="font-semibold text-foreground">
+                        {shareData.isPublic ? "Public Share Link Active" : "Public Access Disabled"}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {shareData.isPublic
+                          ? "Anyone with the link can view this audit deliverable."
+                          : "Only members in this workspace can access this audit."}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={shareSaving}
+                    onClick={() => handleToggleShare(!shareData.isPublic)}
+                    className={`px-3 py-1.5 rounded-md font-semibold text-xs transition ${
+                      shareData.isPublic
+                        ? "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border border-rose-500/30"
+                        : "bg-primary text-primary-foreground hover:opacity-90"
+                    }`}
+                  >
+                    {shareSaving ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : shareData.isPublic ? (
+                      "Disable Link"
+                    ) : (
+                      "Enable Link"
+                    )}
+                  </button>
+                </div>
+
+                {/* Share Link Box */}
+                {shareData.isPublic && shareData.shareToken && (
+                  <div className="space-y-2 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+                    <label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                      <span>Shareable URL</span>
+                      <a
+                        href={`/share/audit/${shareData.shareToken}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline flex items-center gap-1 text-[10px]"
+                      >
+                        Open Portal <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={
+                          typeof window !== "undefined"
+                            ? `${window.location.origin}/share/audit/${shareData.shareToken}`
+                            : `/share/audit/${shareData.shareToken}`
+                        }
+                        className="w-full px-3 py-1.5 rounded border border-border bg-background text-[11px] font-mono select-all focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const fullUrl = `${window.location.origin}/share/audit/${shareData.shareToken}`;
+                          navigator.clipboard.writeText(fullUrl);
+                          setCopiedShareUrl(true);
+                          setTimeout(() => setCopiedShareUrl(false), 2000);
+                        }}
+                        className="px-3 py-1.5 rounded bg-primary text-primary-foreground font-medium text-xs flex items-center gap-1 shrink-0 hover:opacity-90 transition"
+                      >
+                        {copiedShareUrl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedShareUrl ? "Copied" : "Copy"}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Client Customization Fields */}
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-foreground mb-1">
+                      Client Organization / Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Acme Corp, Datwyler Healthcare"
+                      value={clientNameInput}
+                      onChange={(e) => setClientNameInput(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-border bg-background text-xs placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Customizes the white-label header with your client&apos;s brand presentation.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-foreground mb-1 flex items-center gap-1.5">
+                      <Lock className="w-3 h-3 text-muted-foreground" />
+                      <span>Client Access Passcode (Optional)</span>
+                    </label>
+                    <input
+                      type="password"
+                      placeholder={shareData.hasPassword ? "•••••••• (Passcode set — leave blank to keep)" : "Enter passcode to lock portal"}
+                      value={sharePasswordInput}
+                      onChange={(e) => setSharePasswordInput(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-border bg-background text-xs placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      If set, visitors must enter this passcode before viewing audit telemetry.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Modal Action Buttons */}
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShareModalOpen(false)}
+                    className="px-3 py-1.5 rounded border border-border text-xs font-medium hover:bg-secondary transition"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    disabled={shareSaving}
+                    onClick={handleSaveShareSettings}
+                    className="px-4 py-1.5 rounded bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {shareSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    <span>Save Settings</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Toast Feedback Notification */}

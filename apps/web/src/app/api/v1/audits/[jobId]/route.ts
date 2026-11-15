@@ -78,7 +78,9 @@ export async function GET(
     }
 
     const completedCount = job.executions.filter((e) => e.status === "COMPLETED").length;
-    const failedCount = job.executions.filter((e) => e.status === "FAILED").length;
+    const failedCount = job.executions.filter(
+      (e) => e.status === "FAILED" || e.status === "PAUSED"
+    ).length;
     const progressPercentage =
       job.totalUrls > 0 ? Math.round((completedCount / job.totalUrls) * 100) : 0;
 

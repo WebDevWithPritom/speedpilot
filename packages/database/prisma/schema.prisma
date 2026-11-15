@@ -107,14 +107,15 @@ model Project {
   primaryDomain String
   techStack     String       @default("UNKNOWN") // WORDPRESS, WOOCOMMERCE, SHOPIFY, NEXTJS, REACT, LARAVEL, CUSTOM, UNKNOWN
   workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  domains       Domain[]
-  urls          ProjectURL[]
-  auditJobs     AuditJob[]
-  issueGroups   IssueGroup[]
-  reports       Report[]
-  schedules     Schedule[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  domains         Domain[]
+  urls            ProjectURL[]
+  auditJobs       AuditJob[]
+  issueGroups     IssueGroup[]
+  reports         Report[]
+  schedules       Schedule[]
+  keywordRankings KeywordRanking[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   @@index([workspaceId])
 }
@@ -145,6 +146,29 @@ model ProjectURL {
   @@index([projectId])
 }
 
+model KeywordRanking {
+  id               String    @id @default(uuid())
+  projectId        String
+  project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keyword          String
+  targetDomain     String
+  currentRank      Int?      // null if unranked in top 50
+  previousRank     Int?
+  intent           String?   // INFORMATIONAL, COMMERCIAL, TRANSACTIONAL, NAVIGATIONAL
+  country          String?   @default("GLOBAL")
+  targetUrl        String?
+  topCompetitor    String?
+  topCompetitorUrl String?
+  history          Json?     // Array of { rank: number | null, checkedAt: string }
+  lastCheckedAt    DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([projectId, keyword])
+  @@index([projectId])
+  @@index([keyword])
+}
+
 // ==========================================
 // Audit Jobs & Executions
 // ==========================================
@@ -162,6 +186,10 @@ model AuditJob {
   errorMessage  String?          @db.Text
   startedAt     DateTime?
   completedAt   DateTime?
+  isPublic      Boolean          @default(false)
+  shareToken    String?          @unique
+  sharePassword String?
+  clientName    String?
   project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   executions    AuditExecution[]

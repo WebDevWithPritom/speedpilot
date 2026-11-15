@@ -29,6 +29,9 @@ export interface DeveloperDeepSearchResult {
 export interface MarketerDeepSearchResult {
   persona: "MARKETER";
   serpRankRisk: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  currentSearchRank?: number | null; // e.g. 4
+  currentSearchKeyword?: string; // e.g. "gillmor gang old friends"
+  serpPositionStatus?: string; // e.g. "Rank #4 • Page 1 on Google"
   projectedBounceRateDelta: string; // e.g. "-12.4% mobile bounce probability"
   estimatedConversionUplift: string; // e.g. "+3.2% checkout completion"
   plainEnglishSummary: string;

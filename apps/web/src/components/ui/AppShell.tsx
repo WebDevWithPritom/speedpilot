@@ -20,6 +20,16 @@ export function AppShell({ isAuthenticated, initialUser, children }: AppShellPro
   const isPublicMarketing = pathname === "/features" || pathname === "/pricing";
   const isAdminPage = pathname.startsWith("/admin");
   const isPublicLanding = pathname === "/" && !isAuthenticated;
+  const isPublicShare = pathname.startsWith("/share");
+
+  if (isPublicShare) {
+    return (
+      <div className="flex-1 flex flex-col min-h-screen w-full bg-background">
+        <NavigationProgress />
+        {children}
+      </div>
+    );
+  }
 
   if (isAuthPage || isPublicMarketing || isAdminPage) {
     return (

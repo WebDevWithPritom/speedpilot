@@ -16,7 +16,11 @@
     "type-check": "npm run type-check --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "db:generate": "npm run generate --workspace=@speedpilot/database",
-    "db:migrate": "npm run migrate --workspace=@speedpilot/database"
+    "db:migrate": "npm run migrate --workspace=@speedpilot/database",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:smoke": "vitest run tests/integration/live-smoke.test.ts",
+    "export:training": "node scripts/export-training-data.mjs"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

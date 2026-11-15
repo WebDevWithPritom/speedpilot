@@ -7,6 +7,7 @@ import { getDeterministicRecommendation } from "./templates.js";
 import { computeIssueSignature } from "./signature.js";
 import { AIProvider, PROVIDER_DEFAULTS, buildProviderCandidates } from "./providers.js";
 import { detectVendorSignatures } from "./vendor-intelligence.js";
+import { findBestTrainingExemplar } from "./training/training-corpus.js";
 
 export type { AIProvider };
 
@@ -146,7 +147,9 @@ export async function generateAIFixRecommendation(
     .map((e) => e.url)
     .filter((u): u is string => Boolean(u && targetOrigin && u.startsWith("http") && !u.startsWith(targetOrigin)));
 
-  // Build compact evidence payload (< 8KB with optional source snippet)
+  const trainingExemplar = findBestTrainingExemplar(req.issue.code, req.techStack);
+
+  // Build compact evidence payload (< 8KB with optional source snippet & training exemplar)
   const evidencePayload = {
     targetUrl: req.targetUrl,
     detectedTechStack: req.techStack,
@@ -161,6 +164,14 @@ export async function generateAIFixRecommendation(
     })),
     firstPartyUrls,
     thirdPartyUrls,
+    trainingFewShotExemplar: trainingExemplar
+      ? {
+          title: trainingExemplar.title,
+          sampleAuditInput: trainingExemplar.inputDescription,
+          sampleGoldStandardRemediationCode: trainingExemplar.goldStandardOutput.remediationCodeSnippet,
+          sampleDeveloperExplanation: trainingExemplar.goldStandardOutput.explanationDeveloper,
+        }
+      : undefined,
     recommendedFixBaseline: {
       explanationDeveloper: baseline.explanationDeveloper,
       remediationCodeSnippet: baseline.remediationCodeSnippet,
@@ -191,6 +202,7 @@ CRITICAL INSTRUCTION - NO GENERIC OR TEXTBOOK ADVICE:
 4. If third-party tracking scripts are detected (GTM, Meta Pixel, Hotjar, Intercom, Clarity, TikTok, YouTube embeds): Provide the exact Facade Pattern (load on interaction or idle) rather than executing upfront on page load.
 5. If userSourceCode is provided, patch those exact lines and show the modified code block.
 6. Only suggest <link rel="preconnect"> for thirdPartyUrls (NEVER for targetUrl's own domain).
+7. STUDY THE TRAINING FEW-SHOT EXEMPLAR: If 'trainingFewShotExemplar' is provided in the audit evidence, study its architectural precision and copy-pasteable structure. Emulate that gold-standard quality exactly, targeting the real URLs/selectors in 'issue.evidenceItems'.
 
 OUTPUT SCHEMA (Strict JSON only, no markdown outside JSON):
 {

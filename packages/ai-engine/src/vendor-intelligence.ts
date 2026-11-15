@@ -439,6 +439,252 @@ add_action('wp_footer', function() {
 </script>`,
     },
   },
+  {
+    name: "Klaviyo",
+    category: "ANALYTICS",
+    pattern: /klaviyo\.com\/onsite\/js\/klaviyo\.js|a\.klaviyo\.com/i,
+    impact: "Klaviyo onsite tracking bundle (~320KB uncompressed) executes synchronously on page load, capturing form events and degrading mobile TBT and INP.",
+    fixes: {
+      NEXTJS: `// Next.js: Load Klaviyo lazily via next/script strategy="lazyOnload"
+import Script from 'next/script';
+
+<Script src="https://static.klaviyo.com/onsite/js/klaviyo.js?company_id=YOUR_COMPANY_ID" strategy="lazyOnload" />`,
+      WORDPRESS: `// In functions.php: Defer Klaviyo script until first user interaction
+add_action('wp_footer', function() {
+    ?>
+    <script>
+      function loadKlaviyo() {
+        if (window._klaviyoLoaded) return;
+        window._klaviyoLoaded = true;
+        var s = document.createElement('script');
+        s.src = 'https://static.klaviyo.com/onsite/js/klaviyo.js?company_id=YOUR_COMPANY_ID';
+        s.async = true;
+        document.head.appendChild(s);
+      }
+      ['scroll', 'touchstart', 'mousemove'].forEach(ev => window.addEventListener(ev, loadKlaviyo, { once: true, passive: true }));
+    </script>
+    <?php
+}, 99);`,
+      SHOPIFY: `<!-- layout/theme.liquid: Delay Klaviyo until first interaction -->
+<script>
+  ['scroll', 'touchstart', 'mousemove'].forEach(function(ev) {
+    window.addEventListener(ev, function initKlaviyo() {
+      if (window._klaviyoInit) return;
+      window._klaviyoInit = true;
+      var s = document.createElement('script');
+      s.src = 'https://static.klaviyo.com/onsite/js/klaviyo.js?company_id={{ settings.klaviyo_company_id }}';
+      s.async = true;
+      document.head.appendChild(s);
+    }, { once: true, passive: true });
+  });
+</script>`,
+      GENERAL: `<!-- Defer Klaviyo after first interaction -->
+<script>
+  window.addEventListener('pointerdown', function initKlaviyo() {
+    window.removeEventListener('pointerdown', initKlaviyo);
+    var s = document.createElement('script');
+    s.src = 'https://static.klaviyo.com/onsite/js/klaviyo.js?company_id=YOUR_COMPANY_ID';
+    s.async = true;
+    document.head.appendChild(s);
+  }, { once: true, passive: true });
+</script>`,
+    },
+  },
+  {
+    name: "HubSpot",
+    category: "ANALYTICS",
+    pattern: /js\.hs-scripts\.com|js\.hsforms\.net/i,
+    impact: "HubSpot analytics and forms load synchronous tracking bundles, blocking DOM parsing and firing multiple telemetry beacon requests.",
+    fixes: {
+      NEXTJS: `// Next.js: Load HubSpot on idle with next/script
+import Script from 'next/script';
+
+<Script src="https://js.hs-scripts.com/YOUR_PORTAL_ID.js" strategy="lazyOnload" />`,
+      WORDPRESS: `// Defer HubSpot scripts in functions.php
+add_filter('script_loader_tag', function($tag, $handle) {
+    if (strpos($tag, 'js.hs-scripts.com') !== false) {
+        return str_replace(' src', ' defer src', $tag);
+    }
+    return $tag;
+}, 10, 2);`,
+      SHOPIFY: `<!-- Defer HubSpot script in theme.liquid -->
+<script defer src="https://js.hs-scripts.com/YOUR_PORTAL_ID.js"></script>`,
+      GENERAL: `<!-- Defer HubSpot until page load -->
+<script defer src="https://js.hs-scripts.com/YOUR_PORTAL_ID.js"></script>`,
+    },
+  },
+  {
+    name: "Review Widgets (Judge.me / Loox / Yotpo)",
+    category: "UTILITY",
+    pattern: /judge\.me\/widget|loox\.io\/widget|staticw2\.yotpo\.com|widget\.trustpilot\.com/i,
+    impact: "eCommerce review widgets load hundreds of kilobytes of CSS, fonts, and scripts on initial page load even though reviews are far below the fold.",
+    fixes: {
+      NEXTJS: `// Next.js: Load review widget only when the reviews section scrolls into view
+import { useEffect } from 'react';
+
+export function ReviewsSection() {
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.judge.me/widget.js';
+        s.async = true;
+        document.head.appendChild(s);
+        observer.disconnect();
+      }
+    }, { rootMargin: '200px' });
+    const el = document.getElementById('reviews-container');
+    if (el) observer.observe(el);
+  }, []);
+  return <div id="reviews-container">...</div>;
+}`,
+      WORDPRESS: `// Load reviews on scroll in functions.php
+add_action('wp_footer', function() {
+    ?>
+    <script>
+      const reviewObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          const s = document.createElement('script');
+          s.src = 'https://cdn.judge.me/widget.js';
+          s.async = true;
+          document.head.appendChild(s);
+          reviewObserver.disconnect();
+        }
+      }, { rootMargin: '200px' });
+      const target = document.querySelector('.reviews-section');
+      if (target) reviewObserver.observe(target);
+    </script>
+    <?php
+}, 99);`,
+      SHOPIFY: `<!-- In sections/product-reviews.liquid: IntersectionObserver Facade -->
+<div id="product-reviews-facade" class="min-h-[250px]">
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var obs = new IntersectionObserver(function(entries) {
+        if (entries[0].isIntersecting) {
+          var s = document.createElement('script');
+          s.src = 'https://cdn.judge.me/widget.js';
+          s.async = true;
+          document.head.appendChild(s);
+          obs.disconnect();
+        }
+      }, { rootMargin: '300px' });
+      var el = document.getElementById('product-reviews-facade');
+      if (el) obs.observe(el);
+    });
+  </script>
+</div>`,
+      GENERAL: `<!-- Lazy Load Review Widget with IntersectionObserver -->
+<script>
+  const obs = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.judge.me/widget.js';
+      s.async = true;
+      document.head.appendChild(s);
+      obs.disconnect();
+    }
+  }, { rootMargin: '200px' });
+  const el = document.getElementById('reviews');
+  if (el) obs.observe(el);
+</script>`,
+    },
+  },
+  {
+    name: "Google AdSense / DoubleClick (GPT)",
+    category: "ADVERTISING",
+    pattern: /pagead2\.googlesyndication\.com|securepubads\.g\.doubleclick\.net\/tag\/js\/gpt\.js/i,
+    impact: "Ad scripts execute heavy JavaScript execution loops, cause significant layout shifts (CLS), and monopolize network connections on initial paint.",
+    fixes: {
+      NEXTJS: `// Next.js: Async Ad loading with aspect-ratio container to prevent CLS
+<div className="min-h-[250px] w-full bg-slate-50 flex items-center justify-center">
+  <ins className="adsbygoogle"
+       style={{ display: 'block', minHeight: '250px' }}
+       data-ad-client="ca-pub-XXXXXXXXXX"
+       data-ad-slot="XXXXXXXXXX"
+       data-ad-format="auto"
+       data-full-width-responsive="true"></ins>
+</div>
+<Script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXX" strategy="lazyOnload" crossOrigin="anonymous" />`,
+      WORDPRESS: `<!-- Reserve Ad container min-height in CSS to eliminate CLS -->
+<style>
+.ad-slot-wrapper {
+  min-height: 250px;
+  width: 100%;
+  background-color: #f8fafc;
+}
+</style>
+<div class="ad-slot-wrapper">
+  <!-- Ad tag here -->
+</div>`,
+      SHOPIFY: `<!-- Reserve Ad container dimensions -->
+<div style="min-height: 250px; width: 100%; background: #f3f4f6;">
+  <!-- Ad markup loaded asynchronously -->
+</div>`,
+      GENERAL: `<!-- Reserve explicit slot size to prevent Cumulative Layout Shift (CLS) -->
+<div style="min-height: 250px; width: 100%; background: #f3f4f6;">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXX" crossorigin="anonymous"></script>
+</div>`,
+    },
+  },
+  {
+    name: "Customer Support Chat (Zendesk / Tawk.to)",
+    category: "CHAT",
+    pattern: /static\.zdassets\.com|embed\.tawk\.to|cdn\.livechatinc\.com/i,
+    impact: "Chat widgets download 400KB-1MB of JavaScript and open persistent WebSockets before visitors ever decide to initiate contact.",
+    fixes: {
+      NEXTJS: `// Next.js: Chat Button Facade (Zero JS on initial load)
+import { useState } from 'react';
+
+export function ChatFacade() {
+  const [loaded, setLoaded] = useState(false);
+  const openChat = () => {
+    setLoaded(true);
+    const s = document.createElement('script');
+    s.src = 'https://static.zdassets.com/ekr/snippet.js?key=YOUR_KEY';
+    s.async = true;
+    document.head.appendChild(s);
+  };
+  return (
+    <button onClick={openChat} className="fixed bottom-4 right-4 p-4 rounded-full bg-blue-600 text-white shadow-lg">
+      💬 Chat with us
+    </button>
+  );
+}`,
+      WORDPRESS: `<!-- WordPress Click-to-Chat Facade Button -->
+<button id="chat-facade-btn" class="chat-fab" onclick="loadLiveChat()">💬 Help & Support</button>
+<script>
+function loadLiveChat() {
+  var s = document.createElement('script');
+  s.src = 'https://embed.tawk.to/YOUR_KEY/default';
+  s.async = true;
+  document.head.appendChild(s);
+  document.getElementById('chat-facade-btn').remove();
+}
+</script>`,
+      SHOPIFY: `<!-- Click-to-Chat Facade in theme.liquid -->
+<button id="shopify-chat-btn" onclick="loadShopifyChat()" class="chat-facade">💬 Chat with us</button>
+<script>
+function loadShopifyChat() {
+  var s = document.createElement('script');
+  s.src = 'https://static.zdassets.com/ekr/snippet.js?key=YOUR_KEY';
+  s.async = true;
+  document.head.appendChild(s);
+  document.getElementById('shopify-chat-btn').remove();
+}
+</script>`,
+      GENERAL: `<!-- Click-to-Load Chat Widget Facade -->
+<button onclick="loadChat()" class="chat-btn">💬 Chat</button>
+<script>
+function loadChat() {
+  const s = document.createElement('script');
+  s.src = 'https://embed.tawk.to/YOUR_KEY/default';
+  s.async = true;
+  document.head.appendChild(s);
+}
+</script>`,
+    },
+  },
 ];
 
 export function detectVendorSignatures(urls: string[]): VendorMatch[] {

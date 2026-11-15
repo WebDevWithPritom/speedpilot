@@ -8,7 +8,7 @@ if (!url.startsWith("postgres://") && !url.startsWith("postgresql://")) {
 }
 
 console.log("Pushing Prisma schema to PostgreSQL...");
-execSync("npx prisma db push --schema=prisma/schema.prisma --skip-generate", {
+execSync("npx prisma db push --schema=prisma/schema.prisma --skip-generate --accept-data-loss", {
   stdio: "inherit",
   env: { ...process.env, DATABASE_URL: url },
 });

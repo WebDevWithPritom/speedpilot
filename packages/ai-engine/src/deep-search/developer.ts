@@ -61,22 +61,22 @@ export default nextConfig;`,
         return {
           persona: "DEVELOPER",
           detectedStack: techStack,
-          rootCauseAnalysis: `Enqueue scripts/styles in WordPress 'wp_head' without async/defer attributes halts DOM construction for ${wastedMs}ms. Offending asset: ${primaryResource}.`,
+          rootCauseAnalysis: `Synchronous CSS and JS assets in WordPress 'wp_head' halt DOM parsing for ${wastedMs}ms. In WordPress 6.3+, native script loading strategies and core block asset separation eliminate render-blocking without legacy string replacement.`,
           offendingResource: primaryResource,
-          remediationDiff: `// functions.php
-add_filter('style_loader_tag', function($html, $handle) {
-    if (in_array($handle, ['non-critical-plugin-style', 'theme-extra'])) {
-        return str_replace("rel='stylesheet'", "rel='preload' as='style' onload=\\"this.onload=null;this.rel='stylesheet'\\"", $html);
-    }
-    return $html;
-}, 10, 2);
-
-add_filter('script_loader_tag', function($tag, $handle) {
-    if (!is_admin() && $handle !== 'jquery-core') {
-        return str_replace(' src', ' defer src', $tag);
-    }
-    return $tag;
-}, 10, 2);`,
+          remediationDiff: `// functions.php - Modern WordPress 6.3+ Asset Loading
++ // 1. Native script deferral strategy:
++ wp_enqueue_script('theme-main', get_stylesheet_directory_uri() . '/js/main.js', array('jquery'), '1.0', array('strategy' => 'defer', 'in_footer' => true));
++ 
++ // 2. Separate Gutenberg block CSS (load only on pages that use the block):
++ add_filter('should_load_separate_core_block_assets', '__return_true');
++ 
++ // 3. Preload non-critical plugin styles:
++ add_filter('style_loader_tag', function($html, $handle) {
++     if (in_array($handle, ['non-critical-plugin-style', 'theme-extra'])) {
++         return str_replace("rel='stylesheet'", "rel='preload' as='style' onload=\\"this.onload=null;this.rel='stylesheet'\\"", $html) . "<noscript>" . $html . "</noscript>";
++     }
++     return $html;
++ }, 10, 2);`,
           bundlerConfigPatch: `# .htaccess / NGINX Caching header
 <IfModule mod_expires.c>
     ExpiresActive On
@@ -85,7 +85,7 @@ add_filter('script_loader_tag', function($tag, $handle) {
 </IfModule>`,
           cliVerificationCommand: `wp-scripts build && wp cache flush`,
           recommendedPackages: ["wp-scripts"],
-          estimatedDevMinutes: 60,
+          estimatedDevMinutes: 30,
         };
       }
 
@@ -152,6 +152,35 @@ export default {
 +   sizes="100vw"
 +   className="object-cover"
 + />`
+          : techStack === "WORDPRESS" || techStack === "WOOCOMMERCE"
+          ? `// functions.php & single.php (WordPress 6.3+ LCP Optimization)
++ // 1. Preload post thumbnail in <head>:
++ add_action('wp_head', function() {
++   if (is_singular() && has_post_thumbnail()) {
++     echo '<link rel="preload" as="image" href="' . esc_url(get_the_post_thumbnail_url(get_the_ID(), 'large')) . '" fetchpriority="high">' . "\\n";
++   }
++ }, 1);
++ 
++ // 2. Ensure post header featured image renders eager and high priority:
+- the_post_thumbnail('large');
++ the_post_thumbnail('large', array('loading' => 'eager', 'fetchpriority' => 'high', 'decoding' => 'async'));`
+          : techStack === "SHOPIFY"
+          ? `<!-- sections/hero-banner.liquid (Shopify 2.0 LCP Image Optimization) -->
+- <img src="{{ section.settings.image | img_url: 'master' }}" loading="lazy">
++ {{ section.settings.image | image_url: width: 1440 | image_tag:
++   preload: true,
++   fetchpriority: 'high',
++   loading: 'eager',
++   decoding: 'async',
++   widths: '375, 550, 750, 1100, 1440',
++   sizes: '100vw',
++   alt: section.settings.image.alt | default: shop.name | escape
++ }}`
+          : techStack === "LARAVEL"
+          ? `<!-- resources/views/layouts/app.blade.php & hero component -->
++ <link rel="preload" as="image" href="{{ asset('${primaryResource}') }}" fetchpriority="high">
+- <img src="{{ asset('${primaryResource}') }}" loading="lazy">
++ <img src="{{ asset('${primaryResource}') }}" fetchpriority="high" loading="eager" decoding="async" width="1200" height="600">`
           : `<!-- High Priority Hero Preload in <head> -->
 + <link rel="preload" fetchpriority="high" as="image" href="${primaryResource}" type="image/webp">
 <!-- Hero <img> tag -->
@@ -166,7 +195,11 @@ export default {
   },
 };`
           : undefined,
-        cliVerificationCommand: `npx lighthouse ${targetUrl} --only-audits=largest-contentful-paint-element`,
+        cliVerificationCommand: techStack === "SHOPIFY"
+          ? `shopify theme check sections/hero-banner.liquid`
+          : techStack === "LARAVEL"
+          ? `php artisan view:clear && npm run build`
+          : `npx lighthouse ${targetUrl} --only-audits=largest-contentful-paint-element`,
         recommendedPackages: techStack === "NEXTJS" ? ["sharp"] : undefined,
         estimatedDevMinutes: 25,
       };
@@ -198,6 +231,62 @@ export default {
 }`,
         cliVerificationCommand: `npx lighthouse ${targetUrl} --only-audits=cumulative-layout-shift`,
         estimatedDevMinutes: 20,
+      };
+
+    case "non-composited-animations":
+    case "unsupported-animation-keyframes":
+      return {
+        persona: "DEVELOPER",
+        detectedStack: techStack,
+        rootCauseAnalysis: `Animation at '${primaryResource}' targets non-composited properties (e.g. top, left, width, margin), forcing the browser to perform layout calculation and repaint on every frame.`,
+        offendingResource: primaryResource,
+        remediationDiff: `/* Convert layout transitions to GPU-composited transforms */
+- .animated-box {
+-   left: -100px;
+-   transition: left 0.3s ease-out;
+- }
+- .animated-box.open {
+-   left: 0;
+- }
++ .animated-box {
++   transform: translate3d(-100px, 0, 0);
++   opacity: 0;
++   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease-out;
++   will-change: transform, opacity;
++ }
++ .animated-box.open {
++   transform: translate3d(0, 0, 0);
++   opacity: 1;
++ }`,
+        bundlerConfigPatch: `/* CSS will-change rule promotes layer to GPU compositor */
+.animated-box {
+  will-change: transform, opacity;
+}`,
+        cliVerificationCommand: `npx lighthouse ${targetUrl} --only-audits=non-composited-animations`,
+        estimatedDevMinutes: 25,
+      };
+
+    case "dom-size":
+    case "excessive-dom-size":
+      return {
+        persona: "DEVELOPER",
+        detectedStack: techStack,
+        rootCauseAnalysis: `Total DOM elements exceed 800 nodes, inflating style recalculation time and memory usage.`,
+        offendingResource: primaryResource,
+        remediationDiff: techStack === "NEXTJS" || techStack === "REACT"
+          ? `// Virtualize large lists with @tanstack/react-virtual
+- {items.map((item) => <ItemRow key={item.id} item={item} />)}
++ import { useVirtualizer } from '@tanstack/react-virtual';
++ // Render only visible slice (~10 DOM elements instead of 500)`
+          : `/* CSS content-visibility skips layout of offscreen sections */
++ .below-fold-section {
++   content-visibility: auto;
++   contain-intrinsic-size: 0 600px;
++ }`,
+        bundlerConfigPatch: `// Virtualization budget`,
+        cliVerificationCommand: `npx lighthouse ${targetUrl} --only-audits=dom-size`,
+        recommendedPackages: ["@tanstack/react-virtual"],
+        estimatedDevMinutes: 40,
       };
 
     case "interaction-to-next-paint":
@@ -309,6 +398,95 @@ Edge Cache TTL: 1 year for /_next/static/* and /assets/*`,
         estimatedDevMinutes: 15,
       };
 
+    case "unused-javascript":
+    case "unused-css-rules":
+      if (techStack === "WORDPRESS" || techStack === "WOOCOMMERCE") {
+        return {
+          persona: "DEVELOPER",
+          detectedStack: techStack,
+          rootCauseAnalysis: `WooCommerce frontend scripts (cart-fragments) and global Gutenberg block stylesheets are being requested on pages where they are completely unused, adding ${wastedMs}ms of unneeded parsing overhead.`,
+          offendingResource: primaryResource,
+          remediationDiff: `// functions.php - Dequeue Store Bloat & Separate Block Assets
++ // 1. Dequeue WooCommerce Cart Fragments & styles on non-eCommerce pages:
++ add_action('wp_enqueue_scripts', function() {
++     if (function_exists('is_woocommerce') && !is_woocommerce() && !is_cart() && !is_checkout() && !is_account_page()) {
++         wp_dequeue_script('wc-cart-fragments'); // Disables background AJAX polling on content pages
++         wp_dequeue_script('woocommerce');
++         wp_dequeue_style('woocommerce-general');
++         wp_dequeue_style('woocommerce-layout');
++     }
++ }, 99);
++ 
++ // 2. Conditionally load Gutenberg block CSS only when block is rendered:
++ add_filter('should_load_separate_core_block_assets', '__return_true');`,
+          bundlerConfigPatch: `// Disable frontend emoji detection scripts
+remove_action('wp_head', 'print_emoji_detection_script', 7);
+remove_action('wp_print_styles', 'print_emoji_styles');`,
+          cliVerificationCommand: `wp cache flush`,
+          recommendedPackages: ["@wordpress/scripts"],
+          estimatedDevMinutes: 20,
+        };
+      }
+
+      if (techStack === "LARAVEL") {
+        return {
+          persona: "DEVELOPER",
+          detectedStack: "LARAVEL",
+          rootCauseAnalysis: `Unused script bundle '${primaryResource}' loaded on all Blade views. Splitting vendor chunks via Vite cuts initial parsing overhead.`,
+          offendingResource: primaryResource,
+          remediationDiff: `// vite.config.js - Laravel Vite Plugin manualChunks
++ export default defineConfig({
++   plugins: [laravel(['resources/css/app.css', 'resources/js/app.js'])],
++   build: {
++     rollupOptions: {
++       output: {
++         manualChunks: (id) => id.includes('node_modules') ? 'vendor' : undefined,
++       },
++     },
++   },
++ });`,
+          bundlerConfigPatch: `// resources/views/layouts/app.blade.php: Defer non-critical scripts\n@vite(['resources/js/app.js'])`,
+          cliVerificationCommand: `npm run build && php artisan view:cache`,
+          recommendedPackages: ["laravel-vite-plugin"],
+          estimatedDevMinutes: 25,
+        };
+      }
+
+      if (techStack === "SHOPIFY") {
+        return {
+          persona: "DEVELOPER",
+          detectedStack: "SHOPIFY",
+          rootCauseAnalysis: `Cart drawer and theme app extensions in '${primaryResource}' execute synchronously before user interaction.`,
+          offendingResource: primaryResource,
+          remediationDiff: `<!-- layout/theme.liquid -->
+- <script src="{{ 'cart-drawer.js' | asset_url }}"></script>
++ <script src="{{ 'cart-drawer.js' | asset_url }}" defer="defer"></script>`,
+          bundlerConfigPatch: `// Debounce cart quantity updates in cart-drawer.js\nconst debounce = (fn, delay = 300) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); }; };`,
+          cliVerificationCommand: `shopify theme check`,
+          estimatedDevMinutes: 20,
+        };
+      }
+
+      return {
+        persona: "DEVELOPER",
+        detectedStack: techStack,
+        rootCauseAnalysis: `Unused code in bundle '${primaryResource}' increases compile and parse overhead.`,
+        offendingResource: primaryResource,
+        remediationDiff: techStack === "NEXTJS"
+          ? `// Dynamic import non-initial component with { ssr: false }
+- import HeavyWidget from '@/components/HeavyWidget';
++ const HeavyWidget = dynamic(() => import('@/components/HeavyWidget'), { ssr: false });`
+          : techStack === "REACT"
+          ? `// React.lazy dynamic component splitting
+- import HeavyModal from './components/HeavyModal';
++ const HeavyModal = React.lazy(() => import('./components/HeavyModal'));`
+          : `// Lazy load with import()
++ const module = await import('${primaryResource}');`,
+        bundlerConfigPatch: `// Bundle splitting configuration`,
+        cliVerificationCommand: `npx lighthouse ${targetUrl} --only-audits=unused-javascript`,
+        estimatedDevMinutes: 30,
+      };
+
     case "server-response-time":
     case "time-to-first-byte":
     case "ttfb":
@@ -325,12 +503,89 @@ export default async function Page() {
   const data = await fetch('https://api.example.com/items', { next: { revalidate: 3600 } });
   return <main>...</main>;
 }`
+          : techStack === "WORDPRESS" || techStack === "WOOCOMMERCE"
+          ? `// wp-config.php & .htaccess (WordPress Origin Response Optimization)
++ // 1. Limit post revisions to prevent wp_posts and wp_postmeta table bloat:
++ define('WP_POST_REVISIONS', 5);
++ define('WP_CACHE', true);
++ define('WP_REDIS_HOST', '127.0.0.1');
++ 
++ // 2. In .htaccess: Serve cached HTML directly to guest visitors (bypass for logged-in):
++ Header set Cache-Control "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" "expr=%{REQUEST_METHOD} == 'GET' && %{HTTP_COOKIE} !~ /wordpress_logged_in|woocommerce_items_in_cart/"`
+          : techStack === "LARAVEL"
+          ? `// app/Http/Controllers/PostController.php (Eliminate N+1 Queries)
+- $posts = Post::all();
++ $posts = Post::with(['author', 'tags'])->paginate(15);
++ 
++ // Deployment optimizations:
++ // php artisan config:cache && php artisan route:cache && php artisan view:cache`
+          : techStack === "SHOPIFY"
+          ? `<!-- sections/main-collection.liquid: Paginate Liquid Queries -->
+- {% for product in collection.products %}
++ {% paginate collection.products by 24 %}
++   {% for product in collection.products %}
++     {% render 'product-card', product: product %}
++   {% endfor %}
++ {% endpaginate %}`
           : `# Origin Cache Headers (Nginx/Apache)
 + Header set Cache-Control "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400"`,
-        bundlerConfigPatch: `// Database query indexing & connection pooling
+        bundlerConfigPatch: techStack === "WORDPRESS"
+          ? `// Check wp_options autoload size in MySQL:
+// SELECT option_name, length(option_value) FROM wp_options WHERE autoload = 'yes' ORDER BY length(option_value) DESC LIMIT 15;`
+          : techStack === "LARAVEL"
+          ? `// config/cache.php & .env: Use Redis for sessions & caching\nCACHE_DRIVER=redis\nSESSION_DRIVER=redis`
+          : `// Database query indexing & connection pooling
 // Ensure connection pooling (e.g., PgBouncer / Prisma Accelerate) is active`,
-        cliVerificationCommand: `curl -w "TTFB: %{time_starttransfer}s\\n" -o /dev/null -s ${targetUrl}`,
-        estimatedDevMinutes: 40,
+        cliVerificationCommand: techStack === "LARAVEL"
+          ? `php artisan route:cache && php artisan config:cache && curl -w "TTFB: %{time_starttransfer}s\\n" -o /dev/null -s ${targetUrl}`
+          : `curl -w "TTFB: %{time_starttransfer}s\\n" -o /dev/null -s ${targetUrl}`,
+        estimatedDevMinutes: 35,
+      };
+
+    case "bfcache":
+    case "bfcache-not-supported":
+    case "back-forward-cache":
+      return {
+        persona: "DEVELOPER",
+        detectedStack: techStack,
+        rootCauseAnalysis: `Page is blocked from entering browser bfcache. Navigating 'Back' forces a full network round-trip and document rebuild instead of instant memory retrieval.`,
+        offendingResource: primaryResource,
+        remediationDiff: `// Replace deprecated unload listener with pagehide
+- window.addEventListener('unload', (e) => {
+-   cleanupSession();
+- });
++ window.addEventListener('pagehide', (e) => {
++   if (e.persisted) {
++     // Page is stored in bfcache
++   }
++   cleanupSession();
++ });`,
+        bundlerConfigPatch: `// Server header check: ensure Cache-Control is NOT 'no-store' on HTML\nHeader set Cache-Control "private, no-cache, must-revalidate"`,
+        cliVerificationCommand: `npx lighthouse ${targetUrl} --only-audits=bfcache`,
+        estimatedDevMinutes: 20,
+      };
+
+    case "duplicated-javascript":
+    case "legacy-javascript":
+    case "modern-browsers":
+      return {
+        persona: "DEVELOPER",
+        detectedStack: techStack,
+        rootCauseAnalysis: `Duplicated library instances or outdated ES5/IE11 polyfills detected in '${primaryResource}'.`,
+        offendingResource: primaryResource,
+        remediationDiff: `// package.json - Target modern evergreen browsers
+- "browserslist": ["> 0.2%", "not dead"]
++ "browserslist": [
++   "defaults and fully supports es6-module",
++   "> 0.5%",
++   "not dead"
++ ],
++ "overrides": {
++   "lodash": "^4.17.21"
++ }`,
+        bundlerConfigPatch: `// vite.config.js / next.config.mjs: Deduplicate modules via alias\nresolve: { alias: { lodash: 'lodash-es' } }`,
+        cliVerificationCommand: `npx lighthouse ${targetUrl} --only-audits=duplicated-javascript`,
+        estimatedDevMinutes: 25,
       };
 
     case "uses-text-compression":

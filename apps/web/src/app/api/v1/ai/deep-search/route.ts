@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeDeepSearch, DeepSearchRequest } from "@speedpilot/ai-engine";
+import { prisma } from "@speedpilot/database";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,6 +23,35 @@ export async function POST(req: NextRequest) {
       model: body.model,
       baseUrl: body.baseUrl,
     });
+
+    if (result.marketer) {
+      try {
+        const u = new URL(body.targetUrl);
+        const host = u.hostname.replace(/^www\./, "").toLowerCase();
+        const ranking = await prisma.keywordRanking.findFirst({
+          where: {
+            OR: [
+              { targetUrl: { equals: body.targetUrl } },
+              { targetDomain: { equals: host } },
+            ],
+          },
+          orderBy: { currentRank: "asc" },
+        });
+
+        if (ranking && ranking.currentRank) {
+          result.marketer.currentSearchRank = ranking.currentRank;
+          result.marketer.currentSearchKeyword = ranking.keyword;
+          result.marketer.serpPositionStatus =
+            ranking.currentRank === 1
+              ? "Rank #1 on Google • Featured Position"
+              : ranking.currentRank <= 3
+              ? `Top 3 on Google (Rank #${ranking.currentRank})`
+              : ranking.currentRank <= 10
+              ? `Page 1 on Google (Rank #${ranking.currentRank})`
+              : `Page 2+ on Google (Rank #${ranking.currentRank})`;
+        }
+      } catch {}
+    }
 
     return NextResponse.json({
       success: true,

@@ -23,6 +23,8 @@ export interface SerpTrackerResult {
   targetUrl: string | null;
   totalResultsFound: number;
   providerUsed: "GOOGLE_CSE" | "DUCKDUCKGO_HTML";
+  intent: "INFORMATIONAL" | "COMMERCIAL" | "TRANSACTIONAL" | "NAVIGATIONAL";
+  country?: string;
   competitors: SerpCompetitorItem[];
   peopleAlsoAsk: string[];
   aiClimbingAnalysis: {
@@ -31,6 +33,23 @@ export interface SerpTrackerResult {
     topCompetitorDomain: string;
     actionableTips: string[];
   };
+}
+
+/**
+ * Classifies search intent using high-precision query tokenization
+ */
+export function detectSearchIntent(keyword: string): "INFORMATIONAL" | "COMMERCIAL" | "TRANSACTIONAL" | "NAVIGATIONAL" {
+  const kw = keyword.toLowerCase();
+  if (/(login|signin|sign in|official|portal|app|website|contact|support)/i.test(kw)) {
+    return "NAVIGATIONAL";
+  }
+  if (/(buy|purchase|order|hire|pricing|quote|price|cost|coupon|discount|deal|trial|download|signup|subscribe|checkout)/i.test(kw)) {
+    return "TRANSACTIONAL";
+  }
+  if (/(best|top|review|reviews|vs|versus|comparison|compare|alternative|alternatives|tool|tools|software|platform|agency|services|company)/i.test(kw)) {
+    return "COMMERCIAL";
+  }
+  return "INFORMATIONAL";
 }
 
 /**
@@ -75,12 +94,16 @@ export async function trackSerpRank(params: SerpTrackerParams): Promise<SerpTrac
   let peopleAlsoAsk: string[] = [];
   let providerUsed: "GOOGLE_CSE" | "DUCKDUCKGO_HTML" = "DUCKDUCKGO_HTML";
 
+  const intent = detectSearchIntent(keyword);
+  const selectedCountry = (params.country || "GLOBAL").toUpperCase();
+
   // Tier 1: Google Custom Search Engine (if credentials provided)
   if (googleApiKey && googleCx) {
     try {
+      const glParam = selectedCountry !== "GLOBAL" ? `&gl=${selectedCountry.toLowerCase()}` : "";
       const cseUrl = `https://customsearch.googleapis.com/customsearch/v1?key=${encodeURIComponent(
         googleApiKey
-      )}&cx=${encodeURIComponent(googleCx)}&q=${encodeURIComponent(keyword)}&num=10`;
+      )}&cx=${encodeURIComponent(googleCx)}&q=${encodeURIComponent(keyword)}&num=10${glParam}`;
 
       const res = await safeFetch(cseUrl, { timeoutMs: 10_000 });
       if (res.status >= 200 && res.status < 300) {
@@ -115,7 +138,16 @@ export async function trackSerpRank(params: SerpTrackerParams): Promise<SerpTrac
   if (competitors.length === 0) {
     providerUsed = "DUCKDUCKGO_HTML";
     try {
-      const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(keyword)}`;
+      const klMap: Record<string, string> = {
+        IN: "in-en",
+        UK: "uk-en",
+        US: "us-en",
+        CA: "ca-en",
+        AU: "au-en",
+        DE: "de-de",
+      };
+      const klParam = klMap[selectedCountry] ? `&kl=${klMap[selectedCountry]}` : "";
+      const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(keyword)}${klParam}`;
       const res = await safeFetch(searchUrl, {
         timeoutMs: 10_000,
         headers: {
@@ -238,6 +270,8 @@ export async function trackSerpRank(params: SerpTrackerParams): Promise<SerpTrac
     targetUrl,
     totalResultsFound: competitors.length,
     providerUsed,
+    intent,
+    country: selectedCountry,
     competitors,
     peopleAlsoAsk,
     aiClimbingAnalysis: {

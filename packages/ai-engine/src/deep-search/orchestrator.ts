@@ -136,6 +136,9 @@ Return a strict JSON object with 4 specialized keys:
   "marketer": {
     "persona": "MARKETER",
     "serpRankRisk": "HIGH" | "MEDIUM" | "LOW",
+    "currentSearchRank": 4,
+    "currentSearchKeyword": "target search query",
+    "serpPositionStatus": "Rank #4 • Page 1 on Google",
     "projectedBounceRateDelta": "-X% bounce probability reduction",
     "estimatedConversionUplift": "+X% conversion increase",
     "plainEnglishSummary": "Business impact summary without tech jargon",

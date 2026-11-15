@@ -240,18 +240,39 @@ export function getDeterministicRecommendation(
     if (techStack === "WORDPRESS" || techStack === "WOOCOMMERCE") {
       return {
         detectedStack: techStack,
-        explanationMarketer: `Your WordPress theme or plugins are loading heavy styling files before the page shows text${savingsNotice}. Visitors on mobile experience a blank screen during this delay.`,
-        explanationDeveloper: `Theme and plugin scripts enqueued via wp_enqueue_style/script are rendering in <head> without 'defer' or async attributes. Critical CSS is not inlined.`,
-        explanationAgency: `Essential fix for client satisfaction. Inlining critical CSS and deferring non-essential plugin styles will yield an immediate 10-15 point PageSpeed increase.`,
-        explanationSaaSTeam: `WordPress theme asset bloat is degrading mobile conversion rates. Apply critical CSS extraction.`,
-        remediationCodeSnippet: `${contextHeader}${wpPluginNote}// In your theme's functions.php or custom plugin:\nadd_filter('style_loader_tag', function($html, $handle) {\n    if ($handle === 'non-critical-plugin-style') {\n        return str_replace("rel='stylesheet'", "rel='preload' as='style' onload=\\"this.onload=null;this.rel='stylesheet'\\"", $html);\n    }\n    return $html;\n}, 10, 2);${detectedPreloads}${vendorSnippet}`,
+        explanationMarketer: `Your WordPress theme or plugins are loading heavy styling and script files before the page shows text${savingsNotice}. Visitors on mobile experience a blank screen during this delay.`,
+        explanationDeveloper: `Theme and plugin scripts enqueued via wp_enqueue_style/script render synchronously in <head>. In WordPress 6.3+, use native script loading strategies ('strategy' => 'defer' and 'in_footer' => true), enable 'should_load_separate_core_block_assets' to prevent loading all Gutenberg CSS globally, and filter 'style_loader_tag' to asynchronously load non-critical stylesheets.`,
+        explanationAgency: `Essential WordPress optimization. Eliminating render-blocking CSS & JS typically recovers ~500-900ms on mobile, lifting PageSpeed into the high green band.`,
+        explanationSaaSTeam: `Enforce modern WordPress 6.3+ script loading strategies and critical CSS extraction in theme development.`,
+        remediationCodeSnippet: `${contextHeader}${wpPluginNote}// In your child theme's functions.php:
+
+// 1. Modern WP 6.3+ native script loading strategy (defer/async & in_footer):
+add_action('wp_enqueue_scripts', function() {
+    // Pass strategy => 'defer' so the script downloads in background and executes after HTML parse
+    wp_enqueue_script('theme-app', get_stylesheet_directory_uri() . '/js/app.js', array('jquery'), '1.0', array('strategy' => 'defer', 'in_footer' => true));
+}, 20);
+
+// 2. Load Gutenberg block CSS ONLY when blocks are actively rendered on page (saves ~150KB):
+add_filter('should_load_separate_core_block_assets', '__return_true');
+
+// 3. Asynchronously load non-critical plugin stylesheets without parser blocking:
+add_filter('style_loader_tag', function($html, $handle) {
+    $async_handles = ['theme-extra', 'contact-form-7', 'woocommerce-general'];
+    if (in_array($handle, $async_handles, true)) {
+        return str_replace("rel='stylesheet'", "rel='preload' as='style' onload=\\"this.onload=null;this.rel='stylesheet'\\"", $html) . "<noscript>" . $html . "</noscript>";
+    }
+    return $html;
+}, 10, 2);${detectedPreloads}${vendorSnippet}`,
         implementationSteps: [
-          "Audit active plugins enqueuing styles on every page",
-          "Configure a critical CSS solution (or lightweight caching plugin) to inline above-the-fold CSS",
-          "Defer non-critical scripts using add_filter('script_loader_tag')",
+          "Open your child theme's functions.php or create a custom site-performance plugin",
+          "Enable 'should_load_separate_core_block_assets' to stop Gutenberg from loading all block CSS globally",
+          "Register custom scripts using the WP 6.3+ native array('strategy' => 'defer', 'in_footer' => true) argument",
+          "Filter 'style_loader_tag' to asynchronously load secondary plugin stylesheets",
         ],
         verificationSteps: [
-          "Flush WordPress cache and rerun audit in SpeedPilot",
+          "Flush WordPress object cache and caching plugins (LiteSpeed / WP Rocket / WP Super Cache)",
+          "Inspect DevTools Network panel: verify stylesheets have rel='preload' and scripts execute deferred",
+          "Re-run SpeedPilot audit to verify 0ms render-blocking time",
         ],
         estimatedDifficulty: "MEDIUM",
         estimatedImpact: "HIGH",
@@ -265,7 +286,7 @@ export function getDeterministicRecommendation(
         explanationDeveloper: `Shopify Liquid theme.liquid contains synchronous asset_url | stylesheet_tag in the <head>. Third-party app scripts are injected synchronously.`,
         explanationAgency: `Client e-commerce stores lose 7% conversion per second of delay. Eliminating render blocking in theme.liquid gives a noticeable speed boost.`,
         explanationSaaSTeam: `Checkout entry page is blocked by app scripts. Optimize asset delivery in Shopify theme.`,
-        remediationCodeSnippet: `<!-- In layout/theme.liquid: replace standard stylesheet_tag with preload -->\n{{ 'theme.css' | asset_url | preload_tag: as: 'style' }}\n<link rel="stylesheet" href="{{ 'theme.css' | asset_url }}" media="print" onload="this.media='all'">${detectedPreloads}${vendorSnippet}`,
+        remediationCodeSnippet: `<!-- In layout/theme.liquid: replace standard stylesheet_tag with preload -->\n{{ 'theme.css' | asset_url | stylesheet_tag: preload: true }}\n<link rel="stylesheet" href="{{ 'theme.css' | asset_url }}" media="print" onload="this.media='all'">${detectedPreloads}${vendorSnippet}`,
         implementationSteps: [
           "Review installed Shopify Apps in theme.liquid and eliminate orphaned app snippets",
           "Preload main theme CSS and load non-critical stylesheets asynchronously",
@@ -275,6 +296,47 @@ export function getDeterministicRecommendation(
           "Test storefront in Shopify Theme Preview with SpeedPilot",
         ],
         estimatedDifficulty: "MEDIUM",
+        estimatedImpact: "HIGH",
+      };
+    }
+
+    if (techStack === "LARAVEL") {
+      return {
+        detectedStack: "LARAVEL",
+        explanationMarketer: `Synchronous CSS or JS bundles in your Laravel Blade layout delay initial page display for mobile users${savingsNotice}.`,
+        explanationDeveloper: `Render-blocking resources in resources/views/layouts/app.blade.php. Utilize the Laravel Vite plugin with manual chunk splitting in vite.config.js, and load non-critical stylesheets asynchronously.`,
+        explanationAgency: `Direct PageSpeed score improvement on Laravel enterprise web apps.`,
+        explanationSaaSTeam: `Enforce Vite build optimization in Laravel CI/CD deployment pipelines.`,
+        remediationCodeSnippet: `<!-- 1. resources/views/layouts/app.blade.php -->
+@vite(['resources/css/app.css', 'resources/js/app.js'])
+<link rel="preload" href="${primaryUrl || "{{ asset('css/extra.css') }}"}" as="style">
+<link rel="stylesheet" href="${primaryUrl || "{{ asset('css/extra.css') }}"}" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="${primaryUrl || "{{ asset('css/extra.css') }}"}"></noscript>
+
+// 2. vite.config.js (Vite Manual Chunks)
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+
+export default defineConfig({
+    plugins: [
+        laravel({ input: ['resources/css/app.css', 'resources/js/app.js'], refresh: true }),
+    ],
+    build: {
+        rollupOptions: {
+            output: { manualChunks: (id) => id.includes('node_modules') ? 'vendor' : undefined },
+        },
+    },
+});${detectedPreloads}${vendorSnippet}`,
+        implementationSteps: [
+          "Update resources/views/layouts/app.blade.php to load secondary CSS with media='print'",
+          "Configure rollupOptions.output.manualChunks in vite.config.js",
+          "Run 'npm run build' during deployment",
+        ],
+        verificationSteps: [
+          "Run 'php artisan view:clear && npm run build'",
+          "Re-run SpeedPilot audit to verify 0ms render-blocking time",
+        ],
+        estimatedDifficulty: "EASY",
         estimatedImpact: "HIGH",
       };
     }
@@ -424,28 +486,113 @@ window.addEventListener('touchstart', onTouch, { passive: true });`;
   if (issueCode === "server-response-time" || issueCode === "time-to-first-byte" || issueCode === "ttfb") {
     const isWp = techStack === "WORDPRESS" || techStack === "WOOCOMMERCE";
     const isNext = techStack === "NEXTJS";
-    const snippet = isNext
-      ? `// Next.js App Router (app/page.tsx or route.ts)
-// 1. Enable Incremental Static Regeneration (ISR) to serve cached HTML from edge:
-export const revalidate = 3600; // Cache page for 1 hour at edge CDN
+    const isLaravel = techStack === "LARAVEL";
+    const isShopify = techStack === "SHOPIFY";
 
-// 2. In next.config.mjs:
+    let snippet = "";
+    if (isNext) {
+      snippet = `// Next.js 15: Partial Prerendering (PPR) & Streaming SSR for near-instant TTFB
+// 1. In next.config.mjs:
 export default {
+  experimental: {
+    ppr: 'incremental', // Serves static shell instantly (< 50ms) from edge CDN
+  },
   compress: true,
   poweredByHeader: false,
-};`
-      : isWp
-      ? `# WordPress .htaccess / LiteSpeed / Nginx Server Response Optimization
-# 1. Enable LiteSpeed / WP Super Cache Full Page Caching
-# 2. Redis Object Cache in wp-config.php:
+};
+
+// 2. In app/page.tsx:
+import { Suspense } from 'react';
+import { StaticHero } from '@/components/StaticHero';
+import { DynamicUserBadge, BadgeSkeleton } from '@/components/DynamicUserBadge';
+
+export const experimental_ppr = true;
+
+export default function Page() {
+  return (
+    <main>
+      {/* Static hero shell is cached and served immediately (< 50ms TTFB): */}
+      <StaticHero />
+
+      {/* Dynamic user state streams in asynchronously without delaying first byte: */}
+      <Suspense fallback={<BadgeSkeleton />}>
+        <DynamicUserBadge />
+      </Suspense>
+    </main>
+  );
+}`;
+    } else if (techStack === "WOOCOMMERCE") {
+      snippet = `// WooCommerce Database & Query TTFB Optimization (wp-config.php & functions.php):
+// 1. In wp-config.php - Enable Redis Object Cache:
 define('WP_CACHE', true);
 define('WP_REDIS_HOST', '127.0.0.1');
+define('WP_REDIS_PORT', 6379);
 
-# 3. Apache/LiteSpeed Cache Headers for HTML:
+// 2. Cache expensive product subcategory transients in functions.php:
+add_filter('woocommerce_product_subcategories_args', function($args) {
+    $args['cache_results'] = true;
+    return $args;
+});
+
+// 3. MySQL / phpMyAdmin: Add composite index to wp_postmeta to prevent full table scans:
+// ALTER TABLE wp_postmeta ADD INDEX post_id_meta_key (post_id, meta_key(191));
+
+# 4. In .htaccess - Bypass cache for active carts, cache for guests:
 <IfModule mod_headers.c>
-  Header set Cache-Control "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400"
-</IfModule>`
-      : `# Origin Server & CDN Cache Rule (Cloudflare / Fastly / Nginx)
+  Header set Cache-Control "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" "expr=%{REQUEST_METHOD} == 'GET' && %{HTTP_COOKIE} !~ /woocommerce_items_in_cart|wordpress_logged_in/"
+</IfModule>`;
+    } else if (isWp) {
+      snippet = `// 1. In wp-config.php - Enable Redis Object Cache & limit revision bloat:
+define('WP_CACHE', true);
+define('WP_POST_REVISIONS', 5); // Prevents unlimited post revisions from bloating wp_posts
+define('EMPTY_TRASH_DAYS', 7);
+define('WP_REDIS_HOST', '127.0.0.1');
+define('WP_REDIS_PORT', 6379);
+
+// 2. Autoload options health check in MySQL / phpMyAdmin:
+// If autoloaded options > 800KB, it adds 200-800ms to every single page request:
+// SELECT option_name, length(option_value) FROM wp_options WHERE autoload = 'yes' ORDER BY length(option_value) DESC LIMIT 15;
+
+# 3. Apache (.htaccess) / LiteSpeed Cache Rules for Anonymous Guests:
+<IfModule mod_headers.c>
+  # Cache public GET requests at CDN/browser edge, bypass for logged-in users & active cart
+  Header set Cache-Control "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" "expr=%{REQUEST_METHOD} == 'GET' && %{HTTP_COOKIE} !~ /wordpress_logged_in|woocommerce_items_in_cart/"
+</IfModule>`;
+    } else if (isLaravel) {
+      snippet = `// Laravel Performance & TTFB Optimization:
+// 1. In deployment pipeline (CI/CD):
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan event:cache
+
+// 2. Eliminate N+1 SQL queries with Eloquent Eager Loading (app/Http/Controllers/PostController.php):
+$posts = Post::with(['author', 'tags'])
+    ->select(['id', 'title', 'slug', 'author_id', 'created_at'])
+    ->paginate(15);
+
+// 3. Cache frequent queries in Redis:
+$stats = Cache::remember('site.stats', 3600, function () {
+    return DB::table('orders')->count();
+});`;
+    } else if (isShopify) {
+      snippet = `<!-- Shopify Liquid Performance Optimization (Liquid TTFB Reduction) -->
+<!-- 1. Avoid unpaginated, deep loops in collection templates (sections/main-collection.liquid) -->
+{% paginate collection.products by 24 %}
+  <div class="product-grid">
+    {% for product in collection.products %}
+      {% render 'product-card', product: product %}
+    {% endfor %}
+  </div>
+  {% if paginate.pages > 1 %}
+    {% render 'pagination', paginate: paginate %}
+  {% endif %}
+{% endpaginate %}
+
+<!-- 2. Avoid synchronous app snippets in layout/theme.liquid that halt Liquid rendering -->
+<!-- Move heavy external review/upsell widgets into dynamic section blocks loaded via JavaScript -->`;
+    } else {
+      snippet = `# Origin Server & CDN Cache Rule (Cloudflare / Fastly / Nginx)
 # Send modern Cache-Control headers for anonymous HTML requests:
 Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=86400
 
@@ -454,6 +601,7 @@ fastcgi_cache_path /var/cache/nginx levels=1:2 keys_zone=PAGECACHE:100m inactive
 fastcgi_cache PAGECACHE;
 fastcgi_cache_valid 200 301 302 60m;
 add_header X-Cache-Status $upstream_cache_status;`;
+    }
 
     return {
       detectedStack: techStack,
@@ -467,6 +615,10 @@ add_header X-Cache-Status $upstream_cache_status;`;
         "Enable database connection pooling and add indexes to slow un-indexed SQL queries",
         techStack === "NEXTJS"
           ? "Switch heavy dynamic server components to ISR (export const revalidate = 60)"
+          : techStack === "LARAVEL"
+          ? "Run 'php artisan route:cache && php artisan config:cache' and eliminate Eloquent N+1 queries with eager loading"
+          : techStack === "SHOPIFY"
+          ? "Ensure all Liquid collections use {% paginate %} and defer heavy third-party app embeds"
           : "Enable Redis Object Caching and full-page cache in your server stack",
       ],
       verificationSteps: [
@@ -524,13 +676,35 @@ brotli_types text/plain text/css application/javascript application/json image/s
   ) {
     const preconnectTags = buildPreconnectSnippet(origins);
     const preloadTags = urls.length ? buildPreloadSnippet(urls) : `<link rel="preload" href="/css/critical.css" as="style">\n<link rel="preload" href="/fonts/main.woff2" as="font" type="font/woff2" crossorigin>`;
+    const isWp = techStack === "WORDPRESS" || techStack === "WOOCOMMERCE";
+    const wpResourceHintSnippet = isWp
+      ? `\n\n// WordPress Native Resource Hints (in functions.php):
+add_filter('wp_resource_hints', function($urls, $relation_type) {
+    if ('preconnect' === $relation_type) {
+${origins.length ? origins.map((o) => `        $urls[] = array('href' => '${o}', 'crossorigin' => 'anonymous');`).join("\n") : "        $urls[] = array('href' => 'https://fonts.gstatic.com', 'crossorigin' => 'anonymous');"}
+    }
+    return $urls;
+}, 10, 2);`
+      : "";
+
     return {
       detectedStack: techStack,
       explanationMarketer: `Your page waits through a chain of serial server round-trips before loading key scripts, fonts, and styles${savingsNotice}. Adding early browser hints lets the browser connect and download critical files right away.`,
-      explanationDeveloper: `Deep critical request chains or unhinted third-party origins delay First Contentful Paint and LCP${resourceNotice}. Use <link rel="preconnect"> (for third-party domains used immediately), <link rel="preload"> (for critical resources needed on THIS page right away), and <link rel="prefetch"> (low priority, for files needed on the NEXT page click).`,
+      explanationDeveloper: `Deep critical request chains or unhinted third-party origins delay First Contentful Paint and LCP${resourceNotice}. In WordPress, use the native 'wp_resource_hints' filter hook to dispatch preconnect tags cleanly, alongside preloading critical assets.`,
       explanationAgency: `Immediate low-risk <head> fix that cuts 200-800ms of TLS/DNS waterfall delay across third-party CDNs and font hosts.`,
-      explanationSaaSTeam: `Trim serial dependency chains in index.html / layout.tsx to stabilize p75 LCP on mobile connections.`,
-      remediationCodeSnippet: `<!-- 1. Preconnect early to critical third-party origins in <head> -->\n${preconnectTags}\n\n<!-- 2. Preload critical files needed immediately on THIS page -->\n${preloadTags}\n\n<!-- 3. Prefetch likely NEXT-page routes or bundles at idle time (optional) -->\n<link rel="prefetch" href="/about" as="document">${flaggedListComment}`,
+      explanationSaaSTeam: `Trim serial dependency chains in index.html / functions.php to stabilize p75 LCP on mobile connections.`,
+      remediationCodeSnippet: `<!-- 1. Preconnect early to critical third-party origins in <head> -->
+${preconnectTags}
+
+<!-- 2. Preload critical files needed immediately on THIS page -->
+${preloadTags}
+
+<!-- 3. Prefetch likely NEXT-page routes or bundles at idle time (optional) -->
+<link rel="prefetch" href="/about" as="document">${wpResourceHintSnippet}
+
+# 4. HTTP 103 Early Hints (Dispatched by Cloudflare / Nginx during backend TTFB wait):
+# Link: </css/critical.css>; rel=preload; as=style
+# Link: </fonts/main.woff2>; rel=preload; as=font; crossorigin${flaggedListComment}`,
       implementationSteps: [
         "Place up to 4 <link rel='preconnect' crossorigin> tags near the top of <head> for the third-party domains listed above",
         "Use <link rel='preload' as='...'> ONLY for critical hero images, fonts, or above-the-fold CSS needed immediately on first paint",
@@ -561,6 +735,7 @@ const inter = Inter({
   display: 'swap',
   preload: true,
   fallback: ['system-ui', 'sans-serif'],
+  adjustFontFallback: true, // Automatically calculates size-adjust & ascent-override to eliminate CLS!
 });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -573,12 +748,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       : `<!-- 1. Preload primary WOFF2 font in <head> (crossorigin is required even on same origin) -->
 ${fontPreloads}
 
-<!-- 2. Ensure font-display: swap in CSS @font-face (or &display=swap on Google Fonts) -->
+<!-- 2. CSS @font-face with font-display: swap & Metric Overrides to eliminate Layout Shifts (CLS) -->
 <style>
+/* Primary Web Font */
 @font-face {
   font-family: 'PrimaryBrandFont';
   src: url('${fontUrls[0] || "/fonts/primary-400.woff2"}') format('woff2');
   font-display: swap;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+  size-adjust: 107%;
+}
+
+/* Fallback Font adjusted to match Primary Web Font geometry exactly */
+@font-face {
+  font-family: 'FallbackFont';
+  src: local('Arial');
+  ascent-override: 90.49%;
+  descent-override: 22.48%;
+  line-gap-override: 0%;
+  size-adjust: 107.64%;
+}
+
+body {
+  font-family: 'PrimaryBrandFont', 'FallbackFont', sans-serif;
 }
 </style>`;
 
@@ -634,14 +828,58 @@ ${fontPreloads}
     };
   }
 
-  // 9. Modern image formats, responsive sizing & LCP image delivery
+  // 9. Efficient Animated Content (GIF to WebM/MP4)
+  if (issueCode === "efficient-animated-content") {
+    const gifTarget = primaryUrl || "/animations/product-demo.gif";
+    const webmTarget = gifTarget.replace(/\.gif(\?|$)/i, ".webm$1");
+    const mp4Target = gifTarget.replace(/\.gif(\?|$)/i, ".mp4$1");
+    return {
+      detectedStack: techStack,
+      explanationMarketer: `Animated GIFs are massively inefficient, often 5MB to 20MB each. Converting GIFs to silent looping video cuts the file size by 90% while looking identical.`,
+      explanationDeveloper: `Large animated GIF at '${gifTarget}' wastes network transfer and CPU decode cycles. Replace <img> GIF with an HTML5 <video autoplay loop muted playsinline> serving WebM and MP4 formats.`,
+      explanationAgency: `Major bandwidth optimization. Drops page weight by 5-15MB with identical visual fidelity.`,
+      explanationSaaSTeam: `Enforce modern video formats over animated GIFs in CMS asset ingestion guidelines.`,
+      remediationCodeSnippet: `${contextHeader}<!-- Replace heavy animated GIF with efficient looping HTML5 video -->
+<video
+  autoplay
+  loop
+  muted
+  playsinline
+  width="800"
+  height="450"
+  poster="${gifTarget.replace(/\.gif(\?|$)/i, "-poster.webp$1")}"
+  class="w-full h-auto rounded-lg"
+>
+  <source src="${webmTarget}" type="video/webm">
+  <source src="${mp4Target}" type="video/mp4">
+  <!-- Fallback text -->
+  Your browser does not support HTML5 video.
+</video>
+
+# FFmpeg Command to convert GIF to WebM & MP4:
+# ffmpeg -i input.gif -c:v libvpx-vp9 -b:v 0 -crf 30 output.webm
+# ffmpeg -i input.gif -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" output.mp4${flaggedListComment}`,
+      implementationSteps: [
+        "Convert the animated GIF to WebM (for modern browsers) and MP4 (for Safari/iOS) using FFmpeg or an online converter",
+        "Replace the <img> tag with <video autoplay loop muted playsinline>",
+        "Include width, height, and poster attributes to prevent layout shift",
+      ],
+      verificationSteps: [
+        "Inspect Network panel to verify video stream transfers under 500KB instead of 5MB+",
+        "Re-run SpeedPilot audit to verify efficient-animated-content passes",
+      ],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    };
+  }
+
+  // 10. Modern image formats, responsive sizing & LCP image delivery
   if (
     issueCode === "modern-image-formats" ||
     issueCode === "uses-optimized-images" ||
     issueCode === "uses-responsive-images" ||
     issueCode === "image-delivery-insight" ||
-    issueCode === "offscreen-images" ||
-    issueCode === "efficient-animated-content"
+    issueCode === "offscreen-images"
   ) {
     const imgTarget = primaryUrl || "/images/hero-banner.jpg";
     const isNext = techStack === "NEXTJS";
@@ -749,12 +987,18 @@ add_image_size('hero-mobile', 480, 270, true);
     issueCode === "largest-contentful-paint-element" ||
     issueCode === "lcp-breakdown-insight" ||
     issueCode === "prioritize-lcp-image" ||
+    issueCode === "lcp-lazy-loaded" ||
     issueCode === "lcp"
   ) {
     const lcpHref = primaryUrl || "/hero-banner.webp";
     const isNext = techStack === "NEXTJS";
-    const snippet = isNext
-      ? `// Next.js: Fix LCP on hero image in app/page.tsx
+    const isWp = techStack === "WORDPRESS" || techStack === "WOOCOMMERCE";
+    const isShopify = techStack === "SHOPIFY";
+    const isLaravel = techStack === "LARAVEL";
+
+    let snippet = "";
+    if (isNext) {
+      snippet = `// Next.js: Fix LCP on hero image in app/page.tsx
 import Image from 'next/image';
 
 export function HeroSection() {
@@ -771,8 +1015,67 @@ export function HeroSection() {
       />
     </div>
   );
-}`
-      : `<!-- 1. In HTML <head>: High-Priority Preload LCP Asset -->
+}`;
+    } else if (isWp) {
+      snippet = `// In your theme's functions.php (WordPress 6.3+ LCP Optimization):
+
+// 1. Preload post thumbnail in <head> for singular pages:
+add_action('wp_head', function() {
+    if (is_singular() && has_post_thumbnail()) {
+        $img_src = get_the_post_thumbnail_url(get_the_ID(), 'full');
+        if ($img_src) {
+            echo '<link rel="preload" as="image" href="' . esc_url($img_src) . '" fetchpriority="high">' . "\\n";
+        }
+    }
+}, 1);
+
+// 2. In single.php or header template: Ensure hero image NEVER lazy-loads:
+the_post_thumbnail('full', array(
+    'loading'       => 'eager',
+    'fetchpriority' => 'high',
+    'decoding'      => 'async',
+));
+
+// 3. Enable modern WebP / AVIF image output conversion (WP 6.5+):
+add_filter('image_editor_output_format', function($formats) {
+    $formats['image/jpeg'] = 'image/webp';
+    $formats['image/png']  = 'image/webp';
+    return $formats;
+});`;
+    } else if (isShopify) {
+      snippet = `<!-- Shopify Liquid 2.0: Optimize Hero / LCP Image -->
+<!-- 1. In layout/theme.liquid <head>: Preload hero image if on index or product page -->
+{% if template == 'index' and section.settings.image %}
+  <link rel="preload" as="image" href="{{ section.settings.image | image_url: width: 1440 }}" fetchpriority="high">
+{% endif %}
+
+<!-- 2. In sections/hero-banner.liquid: Use image_tag with preload: true and fetchpriority: 'high' -->
+{{ section.settings.image | image_url: width: 1440 | image_tag:
+  preload: true,
+  fetchpriority: 'high',
+  loading: 'eager',
+  decoding: 'async',
+  widths: '375, 550, 750, 1100, 1440',
+  sizes: '100vw',
+  alt: section.settings.image.alt | default: shop.name | escape
+}}`;
+    } else if (isLaravel) {
+      snippet = `<!-- 1. resources/views/layouts/app.blade.php (<head>): Preload LCP Hero -->
+<link rel="preload" as="image" href="{{ asset('${lcpHref}') }}" fetchpriority="high">
+
+<!-- 2. Hero Component (resources/views/components/hero.blade.php) -->
+<img
+  src="{{ asset('${lcpHref}') }}"
+  alt="{{ $title ?? 'Hero banner' }}"
+  fetchpriority="high"
+  loading="eager"
+  decoding="async"
+  width="1200"
+  height="600"
+  class="w-full h-auto object-cover"
+>`;
+    } else {
+      snippet = `<!-- 1. In HTML <head>: High-Priority Preload LCP Asset -->
 <link rel="preload" as="image" href="${lcpHref}" fetchpriority="high">
 
 <!-- 2. On your Hero / LCP <img> Tag: NEVER lazy-load above the fold -->
@@ -785,6 +1088,7 @@ export function HeroSection() {
   width="1200"
   height="600"
 >`;
+    }
 
     return {
       detectedStack: techStack,
@@ -846,17 +1150,137 @@ ${firstNode?.snippet ? `\n<!-- Flagged Shift Element:\n${firstNode.snippet}\n-->
     };
   }
 
-  // 12. Unused JavaScript / Code-Splitting
-  if (issueCode === "unused-javascript" || issueCode === "duplicated-javascript") {
+  // 12. Non-composited animations (avoid layout thrashing during animations)
+  if (issueCode === "non-composited-animations" || issueCode === "unsupported-animation-keyframes") {
+    return {
+      detectedStack: techStack,
+      explanationMarketer: `Animations or smooth transitions on the page stutter and feel choppy on mobile phones because they force the browser to recalculate element sizes on every frame.`,
+      explanationDeveloper: `CSS animations or transitions animate non-composited properties (e.g. 'top', 'left', 'width', 'height', 'margin')${firstNode?.selector ? ` on '${firstNode.selector}'` : ""}. This triggers browser layout recalculations and repaint on every frame. Restructure animations to use compositor-only properties: 'transform' (translate/scale/rotate) and 'opacity'.`,
+      explanationAgency: `Eliminates UI jank and frame drops, delivering 60fps/120fps fluid mobile animations.`,
+      explanationSaaSTeam: `Audit design system animation keyframes to ensure GPU compositor compliance.`,
+      remediationCodeSnippet: `${contextHeader}/* BAD: Animates layout properties, forcing continuous reflows */
+/*
+.fly-in {
+  left: -100px;
+  transition: left 0.3s ease-out;
+}
+.fly-in.active {
+  left: 0;
+}
+*/
+
+/* GOOD: Uses GPU-composited transform and will-change */
+.fly-in {
+  transform: translate3d(-100px, 0, 0);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease-out;
+  will-change: transform, opacity;
+}
+.fly-in.active {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+}
+${firstNode?.snippet ? `\n<!-- Flagged animated element:\n${firstNode.snippet}\n-->` : ""}${flaggedListComment}`,
+      implementationSteps: [
+        "Audit CSS keyframes and transitions for 'top', 'left', 'right', 'bottom', 'width', 'height', or 'margin'",
+        "Replace positional transitions with transform: translate3d(x, y, 0)",
+        "Add will-change: transform, opacity to animated elements so the browser promotes them to dedicated GPU layers",
+      ],
+      verificationSteps: [
+        "Check Chrome DevTools Performance panel: verify animations show zero 'Layout' or 'Paint' tasks during animation timeline",
+        "Re-run SpeedPilot audit to verify non-composited-animations passes",
+      ],
+      estimatedDifficulty: "MEDIUM",
+      estimatedImpact: "HIGH",
+    };
+  }
+
+  // 13. Unused JavaScript / Code-Splitting
+  if (issueCode === "unused-javascript") {
     const jsList = urls.slice(0, 4);
     const thirdPartyNote = thirdParty.length
       ? `\n\n<!-- 3rd-party scripts (${thirdParty.length}) -> Load lazily or after user interaction -->\n${thirdParty.slice(0, 3).map((u) => `<script src="${u}" defer></script>`).join("\n")}`
       : "";
+    const isWp = techStack === "WORDPRESS" || techStack === "WOOCOMMERCE";
     const firstPartyFix =
       isLiteSpeed
         ? `/* LiteSpeed Cache Detected: Page Optimization -> JS Settings:\n   - Enable 'Load JS Deferred' (Delayed) to stop unused JS from blocking initial paint */\n`
         : techStack === "NEXTJS"
         ? `// Next.js: Dynamic-import heavy client components & use next/script strategy="lazyOnload"\nimport dynamic from 'next/dynamic';\nimport Script from 'next/script';\n\n// Defer heavy modal, chart, or rich-text editor components until rendered:\nconst HeavyChart = dynamic(() => import('@/components/HeavyChart'), {\n  ssr: false,\n  loading: () => <div className="h-64 animate-pulse bg-muted rounded" />,\n});\n`
+        : isWp
+        ? `// In functions.php (WordPress & WooCommerce Asset Stripping):
+// 1. Dequeue WooCommerce Cart Fragments & store scripts on non-shop pages:
+add_action('wp_enqueue_scripts', function() {
+    if (function_exists('is_woocommerce') && !is_woocommerce() && !is_cart() && !is_checkout() && !is_account_page()) {
+        wp_dequeue_script('wc-cart-fragments'); // Eliminates uncached ?wc-ajax=get_refreshed_fragments call
+        wp_dequeue_script('woocommerce');
+        wp_dequeue_script('js-cookie');
+    }
+}, 99);
+
+// 2. Disable core emoji detection script & frontend Heartbeat API polling:
+remove_action('wp_head', 'print_emoji_detection_script', 7);
+remove_action('wp_print_styles', 'print_emoji_styles');
+add_action('init', function() {
+    if (!is_admin()) {
+        wp_deregister_script('heartbeat');
+    }
+}, 1);\n`
+        : techStack === "LARAVEL"
+        ? `// vite.config.js (Laravel Vite Plugin - Code Splitting & Manual Chunks)
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+
+export default defineConfig({
+  plugins: [
+    laravel({ input: ['resources/css/app.css', 'resources/js/app.js'], refresh: true }),
+  ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('alpinejs') || id.includes('axios')) return 'vendor-core';
+            return 'vendor-libs';
+          }
+        },
+      },
+    },
+  },
+});\n`
+        : techStack === "SHOPIFY"
+        ? `<!-- Shopify Theme App Extension / Asset Deferral -->
+<!-- 1. In layout/theme.liquid: Defer non-critical apps and cart drawer scripts -->
+<script src="{{ 'cart-drawer.js' | asset_url }}" defer="defer"></script>
+
+<!-- 2. Debounce cart drawer updates to prevent unneeded JS execution on every keystroke -->
+<script>
+  let debounceTimer;
+  function updateCartQuantity(line, qty) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      fetch('/cart/change.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ line: line, quantity: qty })
+      }).then(res => res.json()).then(cart => updateCartDrawerUI(cart));
+    }, 300);
+  }
+</script>\n`
+        : techStack === "REACT"
+        ? `// React SPA / Vite: Code-splitting with React.lazy and Suspense
+import React, { Suspense, lazy } from 'react';
+
+// Route-based or heavy component code splitting:
+const HeavyChart = lazy(() => import('./components/HeavyChart'));
+
+export function Dashboard() {
+  return (
+    <Suspense fallback={<div className="h-64 animate-pulse bg-muted rounded" />}>
+      <HeavyChart />
+    </Suspense>
+  );
+}\n`
         : "";
     const jsDeferTags = firstParty.length
       ? firstParty.slice(0, 3).map((u) => `<script src="${u}" defer></script>`).join("\n")
@@ -888,10 +1312,24 @@ ${firstNode?.snippet ? `\n<!-- Flagged Shift Element:\n${firstNode.snippet}\n-->
   // 13. Unused/Unminified CSS
   if (issueCode === "unused-css-rules" || issueCode === "unminified-css" || issueCode === "unminified-javascript") {
     const isCss = issueCode !== "unminified-javascript";
+    const isWp = techStack === "WORDPRESS" || techStack === "WOOCOMMERCE";
     const cssNote = isLiteSpeed
       ? `/* LiteSpeed Cache Detected: Page Optimization -> CSS Settings:\n   - Enable 'CSS Minify', 'CSS Combine' (optional on HTTP/2), and 'Generate UCSS' */\n\n`
       : isWpRocket
       ? `/* WP Rocket Detected: File Optimization -> Enable 'Minify CSS' & 'Remove Unused CSS' */\n\n`
+      : isWp && isCss
+      ? `// In functions.php (WordPress Unused CSS Elimination):
+// 1. Load Gutenberg block CSS conditionally (only for blocks rendered on this page):
+add_filter('should_load_separate_core_block_assets', '__return_true');
+
+// 2. Dequeue WooCommerce stylesheets on non-store pages:
+add_action('wp_enqueue_scripts', function() {
+    if (function_exists('is_woocommerce') && !is_woocommerce() && !is_cart() && !is_checkout() && !is_account_page()) {
+        wp_dequeue_style('woocommerce-general');
+        wp_dequeue_style('woocommerce-layout');
+        wp_dequeue_style('woocommerce-smallscreen');
+    }
+}, 99);\n\n`
       : "";
     const fixTags = urls.length
       ? buildPreloadSnippet(urls)
@@ -967,6 +1405,91 @@ server {
         "Consolidate server redirects into a single step rather than cascading hops",
       ],
       verificationSteps: ["Run 'curl -ILs https://your-url.com | grep HTTP/' to confirm only 1 final 200 OK"],
+      estimatedDifficulty: "EASY",
+      estimatedImpact: "HIGH",
+    };
+  }
+
+  // 16. Back/Forward Cache (bfcache)
+  if (issueCode === "bfcache" || issueCode === "bfcache-not-supported" || issueCode === "back-forward-cache") {
+    return {
+      detectedStack: techStack,
+      explanationMarketer: `When users hit the browser "Back" button, the page reloads from scratch with a blank screen instead of instantly restoring from memory. Fixing bfcache eligibility makes back/forward navigation instant (0ms).`,
+      explanationDeveloper: `The page is ineligible for bfcache. Common blockers: 1) Using 'unload' event listeners (deprecated; use 'pagehide' instead), 2) Serving HTML with 'Cache-Control: no-store', 3) Leaving active IndexedDB transactions or WebSockets open on unload, 4) Using window.open() without noopener.`,
+      explanationAgency: `Major UX win that eliminates back-navigation churn, boosting user engagement metrics.`,
+      explanationSaaSTeam: `Ensure back/forward navigation satisfies 0ms restore SLA.`,
+      remediationCodeSnippet: `${contextHeader}// 1. Replace legacy 'unload' event listeners with 'pagehide' or 'visibilitychange':
+// BAD:
+// window.addEventListener('unload', cleanupFunction);
+
+// GOOD:
+window.addEventListener('pagehide', (event) => {
+  if (event.persisted) {
+    // Page is being cached into bfcache
+  }
+  // Close active WebSockets/SSE connections so bfcache is not blocked:
+  if (window.activeSocket) {
+    window.activeSocket.close();
+  }
+});
+
+// 2. In server / CDN response headers for HTML documents:
+// BAD:  Cache-Control: no-store
+// GOOD: Cache-Control: private, no-cache, must-revalidate
+
+// 3. For all external links opening new tabs:
+// Ensure rel="noopener noreferrer" is set on <a target="_blank">${flaggedListComment}`,
+      implementationSteps: [
+        "Audit codebase for 'window.addEventListener(\"unload\")' and replace with 'pagehide' or 'visibilitychange'",
+        "Change HTML Cache-Control header from 'no-store' to 'private, no-cache, must-revalidate'",
+        "Close unclosed IndexedDB transactions, WebRTC peers, and WebSockets inside the 'pagehide' listener",
+      ],
+      verificationSteps: [
+        "In Chrome DevTools -> Application -> Back/forward cache, click 'Test back/forward cache' and confirm 'Successfully restored from bfcache'",
+        "Re-run SpeedPilot audit to verify bfcache passes",
+      ],
+      estimatedDifficulty: "MEDIUM",
+      estimatedImpact: "HIGH",
+    };
+  }
+
+  // 17. Duplicated & Legacy JavaScript
+  if (issueCode === "duplicated-javascript" || issueCode === "legacy-javascript" || issueCode === "modern-browsers") {
+    return {
+      detectedStack: techStack,
+      explanationMarketer: `Your website bundles outdated code for ancient browsers (like Internet Explorer 11) or bundles two copies of the same library, making the download twice as heavy for modern smartphones.`,
+      explanationDeveloper: `Found duplicated module versions or legacy ES5/polyfill bloat in production bundles${resourceNotice}. Update browserslist to modern targets (drops 20-40% polyfill weight) and enforce package deduplication with npm overrides or bundler aliases.`,
+      explanationAgency: `Direct 100-300KB bundle size reduction with zero code rewrite.`,
+      explanationSaaSTeam: `Clean dependency tree and lockfile bloat in CI.`,
+      remediationCodeSnippet: `${contextHeader}// 1. In package.json: Modern Browserslist (drops legacy IE11 polyfills):
+"browserslist": [
+  "defaults and fully supports es6-module",
+  "> 0.5%",
+  "not dead",
+  "not op_mini all"
+],
+
+// 2. Deduplicate conflicting library versions in package.json:
+"overrides": {
+  "lodash": "^4.17.21",
+  "date-fns": "^3.0.0"
+}
+
+// 3. In vite.config.js / next.config.mjs: Alias duplicated packages to single instance:
+resolve: {
+  alias: {
+    'lodash': 'lodash-es',
+  },
+}${flaggedListComment}`,
+      implementationSteps: [
+        "Add modern browserslist target in package.json to eliminate unnecessary Babel polyfills",
+        "Run 'npm ls <package-name>' to locate which dependencies are installing duplicate versions",
+        "Add package 'overrides' in package.json and re-run 'npm install'",
+      ],
+      verificationSteps: [
+        "Inspect bundle with @next/bundle-analyzer or rollup-plugin-visualizer to confirm no duplicate packages exist",
+        "Re-run SpeedPilot audit to verify duplicated-javascript passes",
+      ],
       estimatedDifficulty: "EASY",
       estimatedImpact: "HIGH",
     };
