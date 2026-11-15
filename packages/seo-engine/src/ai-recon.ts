@@ -393,8 +393,9 @@ export async function runAIAutonomousRecon(
 
   // Allowed hostnames set (includes both the user-entered domain and any canonical redirect domain)
   const allowedHosts = new Set<string>([baseHostname]);
+  const subfolderCounts = new Map<string, number>();
 
-  // Helper to add a page with classification
+  // Helper to add a page with classification & subfolder diversity
   const registerDiscoveredPage = (
     url: string,
     title: string | null,
@@ -404,7 +405,16 @@ export async function runAIAutonomousRecon(
   ) => {
     if (discoveredPagesMap.has(url)) return;
     const pathname = new URL(url).pathname;
+
+    // Enforce subfolder diversity (max 5 URLs per subfolder path prefix)
+    const firstSegment = pathname.split("/").filter(Boolean)[0] || "/";
+    const currentSubCount = subfolderCounts.get(firstSegment) || 0;
+    if (currentSubCount >= 5 && depth > 0 && discoveredPagesMap.size < maxPages) {
+      return;
+    }
+
     const classification = classifyRoute(url, title);
+    subfolderCounts.set(firstSegment, currentSubCount + 1);
 
     discoveredPagesMap.set(url, {
       url,

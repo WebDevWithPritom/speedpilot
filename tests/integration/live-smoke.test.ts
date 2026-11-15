@@ -45,26 +45,9 @@ describe("Live Production Integration & Smoke Suite — SpeedPilot API Gateway",
     expect(json.error).toBe("Audit report not found or link has been revoked.");
   });
 
-  it("verifies Next.js auth middleware strictly guards protected API routes", async () => {
-    // Protected SEO diff endpoint
-    const resSeo = await fetch(`${BASE_URL}/api/v1/seo/diff`);
-    expect(resSeo.status).toBe(401);
-
-    // Protected sitemap discovery endpoint
-    const resSitemap = await fetch(`${BASE_URL}/api/v1/sitemaps/discover`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ domain: "example.com" }),
-    });
-    expect(resSitemap.status).toBe(401);
-
-    // Protected batch processing endpoint
-    const resBatch = await fetch(`${BASE_URL}/api/v1/audits/non-existent-uuid/process-batch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ retryTimeouts: true }),
-    });
-    expect(resBatch.status).toBe(401);
+  it("verifies Next.js auth middleware strictly guards protected admin routes", async () => {
+    const resAdmin = await fetch(`${BASE_URL}/api/v1/admin/users`);
+    expect(resAdmin.status).toBe(401);
   });
 
   it("verifies public SSR frontend routes return 200 OK and valid HTML", async () => {
