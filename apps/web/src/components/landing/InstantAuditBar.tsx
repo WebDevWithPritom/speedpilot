@@ -242,7 +242,7 @@ export function InstantAuditBar() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-[11px] text-muted-foreground">
               <div className="flex flex-wrap items-center gap-2">
                 <span>Try an example:</span>
-                {["github.com", "nytimes.com", "stripe.com"].map((sample) => (
+                {["vercel.com", "stripe.com", "nytimes.com"].map((sample) => (
                   <button
                     key={sample}
                     type="button"
