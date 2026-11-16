@@ -4,7 +4,7 @@ import { validateAndNormalizeUrl } from "@speedpilot/shared";
 
 export const maxDuration = 60;
 
-const psiClient = new PageSpeedClient();
+const psiClient = new PageSpeedClient({ timeoutMs: 48_000 });
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     // Use custom Google PSI key if provided by user (via header or body)
     const customKey = req.headers.get("x-custom-google-key") || body.apiKey || undefined;
-    const client = customKey ? new PageSpeedClient({ apiKey: customKey }) : psiClient;
+    const client = customKey ? new PageSpeedClient({ apiKey: customKey, timeoutMs: 48_000 }) : psiClient;
 
     // Run PSI single page test
     const result = await client.runAudit(targetUrl, device);
